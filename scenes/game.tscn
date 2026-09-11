@@ -8,7 +8,7 @@
 script = ExtResource("1_uwrxv")
 
 [node name="Grid" type="Node2D" parent="." unique_id=133906913]
-position = Vector2(250, 50)
+position = Vector2(250, 20)
 script = ExtResource("2_yqjtg")
 
 [node name="Player" type="Node2D" parent="." unique_id=541552432]

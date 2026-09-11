@@ -1,7 +1,7 @@
 extends Node2D
 
 
-const GRID_SIZE := 10
+const GRID_SIZE := 9
 const CELL_SIZE := 64
 
 var hovered_cell: Vector2i = Vector2i(-1, -1)
@@ -11,9 +11,10 @@ var blocked_cells: Array[Vector2i] = [
 	Vector2i(3, 3),
 	Vector2i(3, 4),
 	Vector2i(6, 5),
-	Vector2i(7, 5),
-	Vector2i(8, 5)
+	Vector2i(7, 5)
 ]
+
+var reachable_cells: Array[Vector2i] = []
 
 var astar := AStarGrid2D.new()
 
@@ -57,10 +58,69 @@ func find_path(from_cell: Vector2i, to_cell: Vector2i) -> Array[Vector2i]:
 	return raw_path
 
 
+func calculate_reachable_cells(
+	from_cell: Vector2i,
+	max_distance: int
+) -> Array[Vector2i]:
+	var result: Array[Vector2i] = []
+
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			var target := Vector2i(x, y)
+
+			if not is_cell_walkable(target):
+				continue
+
+			var path: Array[Vector2i] = find_path(from_cell, target)
+
+			if path.is_empty():
+				continue
+
+			var distance := path.size() - 1
+
+			if distance <= max_distance:
+				result.append(target)
+
+	return result
+
+
+func set_reachable_cells(cells: Array[Vector2i]) -> void:
+	reachable_cells = cells
+	queue_redraw()
+
+
+func clear_reachable_cells() -> void:
+	reachable_cells.clear()
+	queue_redraw()
+
+
 func _draw() -> void:
 	_draw_blocked_cells()
+	_draw_reachable_cells()
 	_draw_grid()
 	_draw_hovered_cell()
+
+
+func _draw_blocked_cells() -> void:
+	for cell in blocked_cells:
+		var rect := _get_cell_rect(cell)
+
+		draw_rect(
+			rect,
+			Color(0.30, 0.30, 0.30, 1.0),
+			true
+		)
+
+
+func _draw_reachable_cells() -> void:
+	for cell in reachable_cells:
+		var rect := _get_cell_rect(cell)
+
+		draw_rect(
+			rect,
+			Color(0.25, 0.55, 1.0, 0.22),
+			true
+		)
 
 
 func _draw_grid() -> void:
@@ -85,34 +145,11 @@ func _draw_grid() -> void:
 		)
 
 
-func _draw_blocked_cells() -> void:
-	for cell in blocked_cells:
-		var rect := Rect2(
-			Vector2(
-				cell.x * CELL_SIZE,
-				cell.y * CELL_SIZE
-			),
-			Vector2(CELL_SIZE, CELL_SIZE)
-		)
-
-		draw_rect(
-			rect,
-			Color(0.30, 0.30, 0.30, 1.0),
-			true
-		)
-
-
 func _draw_hovered_cell() -> void:
 	if not is_cell_inside(hovered_cell):
 		return
 
-	var rect := Rect2(
-		Vector2(
-			hovered_cell.x * CELL_SIZE,
-			hovered_cell.y * CELL_SIZE
-		),
-		Vector2(CELL_SIZE, CELL_SIZE)
-	)
+	var rect := _get_cell_rect(hovered_cell)
 
 	if is_cell_walkable(hovered_cell):
 		draw_rect(
@@ -126,6 +163,16 @@ func _draw_hovered_cell() -> void:
 			Color(1.0, 0.0, 0.0, 0.25),
 			true
 		)
+
+
+func _get_cell_rect(cell: Vector2i) -> Rect2:
+	return Rect2(
+		Vector2(
+			cell.x * CELL_SIZE,
+			cell.y * CELL_SIZE
+		),
+		Vector2(CELL_SIZE, CELL_SIZE)
+	)
 
 
 func cell_to_local(cell: Vector2i) -> Vector2:
