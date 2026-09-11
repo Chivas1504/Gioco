@@ -17,6 +17,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			var mouse_local: Vector2 = grid.to_local(event.position)
 			var clicked_cell: Vector2i = grid.local_to_cell(mouse_local)
 
-			if grid.is_cell_inside(clicked_cell):
+			if grid.is_cell_walkable(clicked_cell):
 				player_cell = clicked_cell
 				player.position = grid.position + grid.cell_to_local(player_cell)

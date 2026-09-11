@@ -4,7 +4,16 @@ extends Node2D
 const GRID_SIZE := 10
 const CELL_SIZE := 64
 
-var hovered_cell := Vector2i(-1, -1)
+var hovered_cell: Vector2i = Vector2i(-1, -1)
+
+var blocked_cells: Array[Vector2i] = [
+	Vector2i(3, 2),
+	Vector2i(3, 3),
+	Vector2i(3, 4),
+	Vector2i(6, 5),
+	Vector2i(7, 5),
+	Vector2i(8, 5)
+]
 
 
 func _ready() -> void:
@@ -12,8 +21,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	var mouse_local := to_local(get_global_mouse_position())
-	var cell := local_to_cell(mouse_local)
+	var mouse_local: Vector2 = to_local(get_global_mouse_position())
+	var cell: Vector2i = local_to_cell(mouse_local)
 
 	if is_cell_inside(cell):
 		hovered_cell = cell
@@ -24,8 +33,15 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
+	_draw_blocked_cells()
+	_draw_grid()
+	_draw_hovered_cell()
+
+
+func _draw_grid() -> void:
 	for x in range(GRID_SIZE + 1):
-		var x_pos := x * CELL_SIZE
+		var x_pos: float = x * CELL_SIZE
+
 		draw_line(
 			Vector2(x_pos, 0),
 			Vector2(x_pos, GRID_SIZE * CELL_SIZE),
@@ -34,7 +50,8 @@ func _draw() -> void:
 		)
 
 	for y in range(GRID_SIZE + 1):
-		var y_pos := y * CELL_SIZE
+		var y_pos: float = y * CELL_SIZE
+
 		draw_line(
 			Vector2(0, y_pos),
 			Vector2(GRID_SIZE * CELL_SIZE, y_pos),
@@ -42,18 +59,46 @@ func _draw() -> void:
 			1.0
 		)
 
-	if is_cell_inside(hovered_cell):
+
+func _draw_blocked_cells() -> void:
+	for cell in blocked_cells:
 		var rect := Rect2(
 			Vector2(
-				hovered_cell.x * CELL_SIZE,
-				hovered_cell.y * CELL_SIZE
+				cell.x * CELL_SIZE,
+				cell.y * CELL_SIZE
 			),
 			Vector2(CELL_SIZE, CELL_SIZE)
 		)
 
 		draw_rect(
 			rect,
+			Color(0.30, 0.30, 0.30, 1.0),
+			true
+		)
+
+
+func _draw_hovered_cell() -> void:
+	if not is_cell_inside(hovered_cell):
+		return
+
+	var rect := Rect2(
+		Vector2(
+			hovered_cell.x * CELL_SIZE,
+			hovered_cell.y * CELL_SIZE
+		),
+		Vector2(CELL_SIZE, CELL_SIZE)
+	)
+
+	if is_cell_walkable(hovered_cell):
+		draw_rect(
+			rect,
 			Color(1.0, 1.0, 1.0, 0.20),
+			true
+		)
+	else:
+		draw_rect(
+			rect,
+			Color(1.0, 0.0, 0.0, 0.25),
 			true
 		)
 
@@ -67,8 +112,8 @@ func cell_to_local(cell: Vector2i) -> Vector2:
 
 func local_to_cell(local_position: Vector2) -> Vector2i:
 	return Vector2i(
-		floor(local_position.x / CELL_SIZE),
-		floor(local_position.y / CELL_SIZE)
+		floori(local_position.x / CELL_SIZE),
+		floori(local_position.y / CELL_SIZE)
 	)
 
 
@@ -79,3 +124,11 @@ func is_cell_inside(cell: Vector2i) -> bool:
 		and cell.y >= 0
 		and cell.y < GRID_SIZE
 	)
+
+
+func is_cell_blocked(cell: Vector2i) -> bool:
+	return cell in blocked_cells
+
+
+func is_cell_walkable(cell: Vector2i) -> bool:
+	return is_cell_inside(cell) and not is_cell_blocked(cell)
