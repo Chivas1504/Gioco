@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cvwe41x5ap6ge" path="res://scripts/core/game.gd" id="1_uwrxv"]
 [ext_resource type="Script" uid="uid://3jbhk6pxy8nt" path="res://scripts/combat/grid.gd" id="2_yqjtg"]
+[ext_resource type="Script" uid="uid://cweq1lfvmvglo" path="res://scripts/core/player.gd" id="3_lnu2h"]
 
 [node name="Game" type="Node2D" unique_id=1125710800]
 script = ExtResource("1_uwrxv")
@@ -9,3 +10,6 @@ script = ExtResource("1_uwrxv")
 [node name="Grid" type="Node2D" parent="." unique_id=133906913]
 position = Vector2(250, 50)
 script = ExtResource("2_yqjtg")
+
+[node name="Player" type="Node2D" parent="." unique_id=541552432]
+script = ExtResource("3_lnu2h")
