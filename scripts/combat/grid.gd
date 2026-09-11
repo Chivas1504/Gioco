@@ -15,8 +15,11 @@ var blocked_cells: Array[Vector2i] = [
 	Vector2i(8, 5)
 ]
 
+var astar := AStarGrid2D.new()
+
 
 func _ready() -> void:
+	_setup_astar()
 	queue_redraw()
 
 
@@ -30,6 +33,28 @@ func _process(_delta: float) -> void:
 		hovered_cell = Vector2i(-1, -1)
 
 	queue_redraw()
+
+
+func _setup_astar() -> void:
+	astar.region = Rect2i(0, 0, GRID_SIZE, GRID_SIZE)
+	astar.cell_size = Vector2(CELL_SIZE, CELL_SIZE)
+	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
+	astar.update()
+
+	for cell in blocked_cells:
+		astar.set_point_solid(cell, true)
+
+
+func find_path(from_cell: Vector2i, to_cell: Vector2i) -> Array[Vector2i]:
+	if not is_cell_walkable(to_cell):
+		return []
+
+	var raw_path: Array[Vector2i] = astar.get_id_path(from_cell, to_cell)
+
+	if raw_path.is_empty():
+		return []
+
+	return raw_path
 
 
 func _draw() -> void:
