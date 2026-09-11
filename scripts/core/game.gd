@@ -5,6 +5,11 @@ extends Node2D
 @onready var player: Node2D = $Player
 @onready var enemy: Node2D = $Enemy
 
+@onready var hp_label: Label = $UI/HUD/CombatPanel/HPLabel
+@onready var actions_label: Label = $UI/HUD/CombatPanel/ActionsLabel
+@onready var state_label: Label = $UI/HUD/CombatPanel/StateLabel
+
+
 const MOVE_TIME := 0.12
 const ENEMY_MOVE_TIME := 0.18
 
@@ -13,6 +18,7 @@ const PLAYER_MAX_ACTIONS := 2
 
 const PLAYER_MAX_HP := 30
 const ENEMY_DAMAGE := 6
+
 
 var player_cell: Vector2i = Vector2i(0, 0)
 var enemy_cell: Vector2i = Vector2i(6, 4)
@@ -47,13 +53,7 @@ func _ready() -> void:
 
 	grid.set_occupied_cells(occupied)
 
-	print(
-		"HP giocatore: ",
-		player_hp,
-		"/",
-		PLAYER_MAX_HP
-	)
-
+	_update_ui()
 	_update_combat_display()
 
 
@@ -154,15 +154,10 @@ func _move_player_along_path() -> void:
 func _finish_player_action() -> void:
 	player_actions_remaining -= 1
 
-	print(
-		"Azioni rimaste: ",
-		player_actions_remaining
-	)
+	_update_ui()
 
 	if player_actions_remaining <= 0:
 		grid.clear_reachable_cells()
-
-		print("TURNO NEMICO")
 
 		_start_enemy_turn()
 	else:
@@ -171,6 +166,8 @@ func _finish_player_action() -> void:
 
 func _start_enemy_turn() -> void:
 	enemy_is_moving = true
+
+	_update_ui()
 
 	grid.remove_occupied_cell(enemy_cell)
 
@@ -193,8 +190,6 @@ func _start_enemy_turn() -> void:
 
 	grid.remove_occupied_cell(enemy_cell)
 
-	var old_enemy_cell: Vector2i = enemy_cell
-
 	enemy_cell = next_cell
 
 	grid.add_occupied_cell(enemy_cell)
@@ -215,13 +210,6 @@ func _start_enemy_turn() -> void:
 
 	tween.finished.connect(
 		func() -> void:
-			print(
-				"Nemico: ",
-				old_enemy_cell,
-				" -> ",
-				enemy_cell
-			)
-
 			_finish_enemy_turn()
 	)
 
@@ -232,18 +220,7 @@ func _enemy_attack() -> void:
 	if player_hp < 0:
 		player_hp = 0
 
-	print(
-		"Il nemico colpisce il giocatore per ",
-		ENEMY_DAMAGE,
-		" danni."
-	)
-
-	print(
-		"HP giocatore: ",
-		player_hp,
-		"/",
-		PLAYER_MAX_HP
-	)
+	_update_ui()
 
 	if player_hp <= 0:
 		_player_died()
@@ -259,9 +236,7 @@ func _player_died() -> void:
 
 	grid.clear_reachable_cells()
 
-	print("")
-	print("IL RICUCITO È MORTO")
-	print("FINE DELLA RUN")
+	_update_ui()
 
 
 func _finish_enemy_turn() -> void:
@@ -272,13 +247,7 @@ func _finish_enemy_turn() -> void:
 
 	player_actions_remaining = PLAYER_MAX_ACTIONS
 
-	print("TURNO GIOCATORE")
-
-	print(
-		"Azioni disponibili: ",
-		player_actions_remaining
-	)
-
+	_update_ui()
 	_update_combat_display()
 
 
@@ -291,15 +260,7 @@ func _toggle_combat_mode() -> void:
 	if combat_mode:
 		player_actions_remaining = PLAYER_MAX_ACTIONS
 
-		print("COMBATTIMENTO ATTIVO")
-
-		print(
-			"Azioni disponibili: ",
-			player_actions_remaining
-		)
-	else:
-		print("ESPLORAZIONE LIBERA")
-
+	_update_ui()
 	_update_combat_display()
 
 
@@ -315,3 +276,28 @@ func _update_combat_display() -> void:
 		grid.set_reachable_cells(reachable)
 	else:
 		grid.clear_reachable_cells()
+
+
+func _update_ui() -> void:
+	hp_label.text = (
+		"HP: "
+		+ str(player_hp)
+		+ "/"
+		+ str(PLAYER_MAX_HP)
+	)
+
+	actions_label.text = (
+		"Azioni: "
+		+ str(player_actions_remaining)
+		+ "/"
+		+ str(PLAYER_MAX_ACTIONS)
+	)
+
+	if player_is_dead:
+		state_label.text = "MORTO"
+	elif enemy_is_moving:
+		state_label.text = "TURNO NEMICO"
+	elif combat_mode:
+		state_label.text = "TURNO GIOCATORE"
+	else:
+		state_label.text = "ESPLORAZIONE"
