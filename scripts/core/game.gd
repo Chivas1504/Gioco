@@ -3,11 +3,13 @@ extends Node2D
 
 @onready var grid: Node2D = $Grid
 @onready var player: Node2D = $Player
+@onready var enemy: Node2D = $Enemy
 
 const MOVE_TIME := 0.12
 const COMBAT_MOVE_RANGE := 2
 
 var player_cell: Vector2i = Vector2i(0, 0)
+var enemy_cell: Vector2i = Vector2i(6, 4)
 
 var current_path: Array[Vector2i] = []
 var is_moving: bool = false
@@ -15,7 +17,22 @@ var combat_mode: bool = false
 
 
 func _ready() -> void:
-	player.position = grid.position + grid.cell_to_local(player_cell)
+	player.position = (
+		grid.position
+		+ grid.cell_to_local(player_cell)
+	)
+
+	enemy.position = (
+		grid.position
+		+ grid.cell_to_local(enemy_cell)
+	)
+
+	var occupied: Array[Vector2i] = [
+		enemy_cell
+	]
+
+	grid.set_occupied_cells(occupied)
+
 	_update_combat_display()
 
 
@@ -30,13 +47,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if (
+			event.button_index == MOUSE_BUTTON_LEFT
+			and event.pressed
+		):
 			_handle_grid_click(event.position)
 
 
-func _handle_grid_click(mouse_position: Vector2) -> void:
-	var mouse_local: Vector2 = grid.to_local(mouse_position)
-	var clicked_cell: Vector2i = grid.local_to_cell(mouse_local)
+func _handle_grid_click(
+	mouse_position: Vector2
+) -> void:
+	var mouse_local: Vector2 = grid.to_local(
+		mouse_position
+	)
+
+	var clicked_cell: Vector2i = (
+		grid.local_to_cell(mouse_local)
+	)
 
 	if not grid.is_cell_walkable(clicked_cell):
 		return

@@ -14,6 +14,7 @@ var blocked_cells: Array[Vector2i] = [
 	Vector2i(7, 5)
 ]
 
+var occupied_cells: Array[Vector2i] = []
 var reachable_cells: Array[Vector2i] = []
 
 var astar := AStarGrid2D.new()
@@ -42,15 +43,60 @@ func _setup_astar() -> void:
 	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
 	astar.update()
 
+	_refresh_astar_solids()
+
+
+func _refresh_astar_solids() -> void:
+	for x in range(GRID_SIZE):
+		for y in range(GRID_SIZE):
+			astar.set_point_solid(Vector2i(x, y), false)
+
 	for cell in blocked_cells:
 		astar.set_point_solid(cell, true)
 
+	for cell in occupied_cells:
+		astar.set_point_solid(cell, true)
 
-func find_path(from_cell: Vector2i, to_cell: Vector2i) -> Array[Vector2i]:
+
+func set_occupied_cells(cells: Array[Vector2i]) -> void:
+	occupied_cells = cells
+	_refresh_astar_solids()
+	queue_redraw()
+
+
+func add_occupied_cell(cell: Vector2i) -> void:
+	if cell not in occupied_cells:
+		occupied_cells.append(cell)
+		_refresh_astar_solids()
+		queue_redraw()
+
+
+func remove_occupied_cell(cell: Vector2i) -> void:
+	if cell in occupied_cells:
+		occupied_cells.erase(cell)
+		_refresh_astar_solids()
+		queue_redraw()
+
+
+func find_path(
+	from_cell: Vector2i,
+	to_cell: Vector2i
+) -> Array[Vector2i]:
 	if not is_cell_walkable(to_cell):
 		return []
 
-	var raw_path: Array[Vector2i] = astar.get_id_path(from_cell, to_cell)
+	var from_was_occupied := from_cell in occupied_cells
+
+	if from_was_occupied:
+		astar.set_point_solid(from_cell, false)
+
+	var raw_path: Array[Vector2i] = astar.get_id_path(
+		from_cell,
+		to_cell
+	)
+
+	if from_was_occupied:
+		astar.set_point_solid(from_cell, true)
 
 	if raw_path.is_empty():
 		return []
@@ -68,10 +114,17 @@ func calculate_reachable_cells(
 		for y in range(GRID_SIZE):
 			var target := Vector2i(x, y)
 
+			if target == from_cell:
+				result.append(target)
+				continue
+
 			if not is_cell_walkable(target):
 				continue
 
-			var path: Array[Vector2i] = find_path(from_cell, target)
+			var path: Array[Vector2i] = find_path(
+				from_cell,
+				target
+			)
 
 			if path.is_empty():
 				continue
@@ -96,6 +149,7 @@ func clear_reachable_cells() -> void:
 
 func _draw() -> void:
 	_draw_blocked_cells()
+	_draw_occupied_cells()
 	_draw_reachable_cells()
 	_draw_grid()
 	_draw_hovered_cell()
@@ -108,6 +162,17 @@ func _draw_blocked_cells() -> void:
 		draw_rect(
 			rect,
 			Color(0.30, 0.30, 0.30, 1.0),
+			true
+		)
+
+
+func _draw_occupied_cells() -> void:
+	for cell in occupied_cells:
+		var rect := _get_cell_rect(cell)
+
+		draw_rect(
+			rect,
+			Color(0.45, 0.10, 0.10, 0.35),
 			true
 		)
 
@@ -202,5 +267,13 @@ func is_cell_blocked(cell: Vector2i) -> bool:
 	return cell in blocked_cells
 
 
+func is_cell_occupied(cell: Vector2i) -> bool:
+	return cell in occupied_cells
+
+
 func is_cell_walkable(cell: Vector2i) -> bool:
-	return is_cell_inside(cell) and not is_cell_blocked(cell)
+	return (
+		is_cell_inside(cell)
+		and not is_cell_blocked(cell)
+		and not is_cell_occupied(cell)
+	)
