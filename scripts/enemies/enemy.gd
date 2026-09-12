@@ -5,6 +5,12 @@ extends Node2D
 const RADIUS := 20.0
 const MAX_HP := 25
 
+const BASE_ATTACK_DAMAGE := 6
+const HEAD_BROKEN_ATTACK_DAMAGE := 4
+const ARMS_BROKEN_ATTACK_DAMAGE := 3
+
+const TORSO_DAMAGE_MULTIPLIER := 1.25
+
 const BODY_PART_ORDER: Array[String] = [
 	"Testa",
 	"Torso",
@@ -52,13 +58,27 @@ func _draw() -> void:
 	)
 
 
-func take_vitality_damage(amount: int) -> int:
+func take_vitality_damage(
+	amount: int,
+	apply_torso_bonus: bool = true
+) -> int:
 	if amount <= 0:
 		return 0
 
+	var final_damage: int = amount
+
+	if (
+		apply_torso_bonus
+		and is_part_destroyed("Torso")
+	):
+		final_damage = roundi(
+			final_damage
+			* TORSO_DAMAGE_MULTIPLIER
+		)
+
 	var old_hp: int = hp
 
-	hp -= amount
+	hp -= final_damage
 
 	if hp < 0:
 		hp = 0
@@ -81,6 +101,12 @@ func take_part_damage(
 
 	if not body_parts.has(part_name):
 		return result
+
+	# Serve per evitare che il colpo che distrugge
+	# il Torso riceva già il bonus del +25%.
+	var torso_was_destroyed: bool = (
+		is_part_destroyed("Torso")
+	)
 
 	var part: Dictionary = body_parts[part_name]
 
@@ -112,7 +138,8 @@ func take_part_damage(
 
 	var actual_vitality_damage: int = (
 		take_vitality_damage(
-			requested_vitality_damage
+			requested_vitality_damage,
+			torso_was_destroyed
 		)
 	)
 
@@ -136,7 +163,12 @@ func is_dead() -> bool:
 
 
 func get_body_part_names() -> Array[String]:
-	return BODY_PART_ORDER.duplicate()
+	var result: Array[String] = []
+
+	for part_name in BODY_PART_ORDER:
+		result.append(part_name)
+
+	return result
 
 
 func get_part_integrity(
@@ -179,7 +211,12 @@ func can_move() -> bool:
 
 
 func get_attack_damage() -> int:
-	if is_part_destroyed("Braccia"):
-		return 3
+	var damage: int = BASE_ATTACK_DAMAGE
 
-	return 6
+	if is_part_destroyed("Testa"):
+		damage = HEAD_BROKEN_ATTACK_DAMAGE
+
+	if is_part_destroyed("Braccia"):
+		damage = ARMS_BROKEN_ATTACK_DAMAGE
+
+	return damage
