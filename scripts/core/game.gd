@@ -46,6 +46,7 @@ var chiodo_del_giudizio: CardData
 var maglio_della_pena: CardData
 var bende_del_viandante: CardData
 var catena_del_contrappasso: CardData
+var spinta_dei_condannati: CardData
 
 
 func _ready() -> void:
@@ -77,6 +78,7 @@ func _create_test_cards() -> void:
 		0,
 		1,
 		0,
+		0,
 		mannaia_tags
 	)
 
@@ -92,6 +94,7 @@ func _create_test_cards() -> void:
 		6,
 		0,
 		5,
+		0,
 		0,
 		chiodo_tags
 	)
@@ -109,6 +112,7 @@ func _create_test_cards() -> void:
 		0,
 		1,
 		0,
+		0,
 		maglio_tags
 	)
 
@@ -122,6 +126,7 @@ func _create_test_cards() -> void:
 		1,
 		0,
 		6,
+		0,
 		0,
 		0,
 		bende_tags
@@ -141,7 +146,26 @@ func _create_test_cards() -> void:
 		0,
 		3,
 		1,
+		0,
 		catena_tags
+	)
+
+	var spinta_tags: Array[String] = [
+		"Impatto",
+		"Mischia",
+		"Controllo",
+		"Spinta"
+	]
+
+	spinta_dei_condannati = CardData.new(
+		"Spinta dei Condannati",
+		1,
+		3,
+		0,
+		1,
+		0,
+		1,
+		spinta_tags
 	)
 
 
@@ -173,6 +197,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 			if event.keycode == KEY_5:
 				_try_use_card(catena_del_contrappasso)
+				return
+
+			if event.keycode == KEY_6:
+				_try_use_card(spinta_dei_condannati)
 				return
 
 	if is_moving or enemy_is_moving:
@@ -335,6 +363,9 @@ func _use_attack_card(card: CardData) -> void:
 	if card.pull_distance > 0:
 		_pull_enemy(card.pull_distance)
 
+	if card.push_distance > 0:
+		_push_enemy(card.push_distance)
+
 	_update_ui()
 
 	_finish_player_action(card.action_cost)
@@ -377,6 +408,52 @@ func _pull_enemy(pull_distance: int) -> void:
 
 		print(
 			"Nemico trascinato nella cella ",
+			enemy_cell
+		)
+
+
+func _push_enemy(push_distance: int) -> void:
+	for step in range(push_distance):
+		var direction: Vector2i = enemy_cell - player_cell
+
+		if direction.x != 0:
+			direction.x = signi(direction.x)
+
+		if direction.y != 0:
+			direction.y = signi(direction.y)
+
+		var next_cell: Vector2i = enemy_cell + direction
+
+		if not grid.is_cell_inside(next_cell):
+			print("Il nemico non può essere spinto fuori dalla griglia.")
+			return
+
+		if next_cell == player_cell:
+			return
+
+		grid.remove_occupied_cell(enemy_cell)
+
+		var can_move: bool = grid.is_cell_walkable(next_cell)
+
+		grid.add_occupied_cell(enemy_cell)
+
+		if not can_move:
+			print("La spinta è bloccata.")
+			return
+
+		grid.remove_occupied_cell(enemy_cell)
+
+		enemy_cell = next_cell
+
+		grid.add_occupied_cell(enemy_cell)
+
+		enemy.position = (
+			grid.position
+			+ grid.cell_to_local(enemy_cell)
+		)
+
+		print(
+			"Nemico spinto nella cella ",
 			enemy_cell
 		)
 

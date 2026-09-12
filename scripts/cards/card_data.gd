@@ -10,6 +10,7 @@ var healing: int = 0
 
 var attack_range: int = 0
 var pull_distance: int = 0
+var push_distance: int = 0
 
 var tags: Array[String] = []
 
@@ -21,6 +22,7 @@ func _init(
 	new_healing: int = 0,
 	new_attack_range: int = 0,
 	new_pull_distance: int = 0,
+	new_push_distance: int = 0,
 	new_tags: Array[String] = []
 ) -> void:
 	card_name = new_name
@@ -31,5 +33,6 @@ func _init(
 
 	attack_range = new_attack_range
 	pull_distance = new_pull_distance
+	push_distance = new_push_distance
 
 	tags = new_tags
