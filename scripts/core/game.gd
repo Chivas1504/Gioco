@@ -63,7 +63,7 @@ var spinta_dei_condannati: CardData
 
 
 func _ready() -> void:
-	_create_test_cards()
+	_load_test_cards()
 
 	player.position = (
 		grid.position
@@ -89,109 +89,30 @@ func _ready() -> void:
 	_update_combat_display()
 
 
-func _create_test_cards() -> void:
-	var mannaia_tags: Array[String] = [
-		"Taglio",
-		"Mischia"
-	]
-
-	mannaia_del_carnefice = CardData.new(
-		"Mannaia del Carnefice",
-		1,
-		7,
-		0,
-		1,
-		0,
-		0,
-		mannaia_tags
+func _load_test_cards() -> void:
+	mannaia_del_carnefice = CardDatabase.get_card(
+		CardDatabase.MANNAIA_DEL_CARNEFICE
 	)
 
-	var chiodo_tags: Array[String] = [
-		"Perforazione",
-		"Distanza",
-		"Mira"
-	]
-
-	chiodo_del_giudizio = CardData.new(
-		"Chiodo del Giudizio",
-		1,
-		6,
-		0,
-		5,
-		0,
-		0,
-		chiodo_tags
+	chiodo_del_giudizio = CardDatabase.get_card(
+		CardDatabase.CHIODO_DEL_GIUDIZIO
 	)
 
-	var maglio_tags: Array[String] = [
-		"Impatto",
-		"Mischia",
-		"Pesante"
-	]
-
-	maglio_della_pena = CardData.new(
-		"Maglio della Pena",
-		2,
-		10,
-		0,
-		1,
-		0,
-		0,
-		maglio_tags
+	maglio_della_pena = CardDatabase.get_card(
+		CardDatabase.MAGLIO_DELLA_PENA
 	)
 
-	var bende_tags: Array[String] = [
-		"Cura",
-		"Supporto"
-	]
-
-	bende_del_viandante = CardData.new(
-		"Bende del Viandante",
-		1,
-		0,
-		6,
-		0,
-		0,
-		0,
-		bende_tags
+	bende_del_viandante = CardDatabase.get_card(
+		CardDatabase.BENDE_DEL_VIANDANTE
 	)
 
-	var catena_tags: Array[String] = [
-		"Impatto",
-		"Distanza",
-		"Controllo",
-		"Tiro"
-	]
-
-	catena_del_contrappasso = CardData.new(
-		"Catena del Contrappasso",
-		1,
-		4,
-		0,
-		3,
-		1,
-		0,
-		catena_tags
+	catena_del_contrappasso = CardDatabase.get_card(
+		CardDatabase.CATENA_DEL_CONTRAPPASSO
 	)
 
-	var spinta_tags: Array[String] = [
-		"Impatto",
-		"Mischia",
-		"Controllo",
-		"Spinta"
-	]
-
-	spinta_dei_condannati = CardData.new(
-		"Spinta dei Condannati",
-		1,
-		3,
-		0,
-		1,
-		0,
-		1,
-		spinta_tags
+	spinta_dei_condannati = CardDatabase.get_card(
+		CardDatabase.SPINTA_DEI_CONDANNATI
 	)
-
 
 func _unhandled_input(
 	event: InputEvent

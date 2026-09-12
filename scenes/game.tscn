@@ -85,7 +85,7 @@ offset_bottom = 200.0
 autowrap_mode = 3
 
 [node name="EnemyStatusLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1127790825]
-custom_maximum_size = Vector2(220, -1)
+custom_maximum_size = Vector2(220, 45)
 layout_mode = 0
 offset_left = 10.0
 offset_top = 205.0
