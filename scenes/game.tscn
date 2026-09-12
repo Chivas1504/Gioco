@@ -27,7 +27,7 @@ offset_right = 40.0
 offset_bottom = 40.0
 
 [node name="CombatPanel" type="Panel" parent="UI/HUD" unique_id=1667139331]
-custom_minimum_size = Vector2(220, 140)
+custom_minimum_size = Vector2(220, 170)
 custom_maximum_size = Vector2(0, 0)
 layout_mode = 0
 offset_left = 20.0
@@ -66,3 +66,11 @@ offset_top = 100.0
 offset_right = 50.0
 offset_bottom = 123.0
 text = "Nemico: 25/25 HP"
+
+[node name="TargetPartLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1209258386]
+custom_minimum_size = Vector2(10, 130)
+layout_mode = 0
+offset_top = 130.0
+offset_right = 86.0
+offset_bottom = 260.0
+text = "Mira: Testa"
