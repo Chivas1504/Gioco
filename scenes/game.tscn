@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://3jbhk6pxy8nt" path="res://scripts/combat/grid.gd" id="2_yqjtg"]
 [ext_resource type="Script" uid="uid://cweq1lfvmvglo" path="res://scripts/core/player.gd" id="3_lnu2h"]
 [ext_resource type="Script" uid="uid://skthj2slgduj" path="res://scripts/enemies/enemy.gd" id="4_lbhrr"]
+[ext_resource type="Script" uid="uid://cd3revhfdhmpv" path="res://scripts/ui/card_bar.gd" id="5_iywne"]
 
 [node name="Game" type="Node2D" unique_id=1125710800]
 script = ExtResource("1_uwrxv")
@@ -92,3 +93,18 @@ offset_top = 205.0
 offset_right = 230.0
 offset_bottom = 250.0
 autowrap_mode = 3
+
+[node name="CardBar" type="HBoxContainer" parent="UI/HUD" unique_id=1747839705]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 470.0
+offset_right = 1080.0
+offset_bottom = 590.0
+grow_horizontal = 2
+grow_vertical = 0
+offset_transform_enabled = true
+script = ExtResource("5_iywne")

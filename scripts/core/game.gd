@@ -19,6 +19,10 @@ extends Node2D
 	$UI/HUD/CombatPanel/EnemyStatusLabel
 )
 
+@onready var card_bar = (
+	$UI/HUD/CardBar
+)
+
 
 const MOVE_TIME := 0.12
 const ENEMY_MOVE_TIME := 0.18
@@ -61,10 +65,13 @@ var bende_del_viandante: CardData
 var catena_del_contrappasso: CardData
 var spinta_dei_condannati: CardData
 
+var active_cards: Array[CardData] = []
+
 
 func _ready() -> void:
 	_load_test_cards()
 	_load_test_enemy()
+	_setup_card_bar()
 
 	player.position = (
 		grid.position
@@ -84,36 +91,59 @@ func _ready() -> void:
 		enemy_cell
 	]
 
-	grid.set_occupied_cells(occupied)
+	grid.set_occupied_cells(
+		occupied
+	)
 
 	_update_ui()
 	_update_combat_display()
 
 
 func _load_test_cards() -> void:
-	mannaia_del_carnefice = CardDatabase.get_card(
-		CardDatabase.MANNAIA_DEL_CARNEFICE
+	mannaia_del_carnefice = (
+		CardDatabase.get_card(
+			CardDatabase.MANNAIA_DEL_CARNEFICE
+		)
 	)
 
-	chiodo_del_giudizio = CardDatabase.get_card(
-		CardDatabase.CHIODO_DEL_GIUDIZIO
+	chiodo_del_giudizio = (
+		CardDatabase.get_card(
+			CardDatabase.CHIODO_DEL_GIUDIZIO
+		)
 	)
 
-	maglio_della_pena = CardDatabase.get_card(
-		CardDatabase.MAGLIO_DELLA_PENA
+	maglio_della_pena = (
+		CardDatabase.get_card(
+			CardDatabase.MAGLIO_DELLA_PENA
+		)
 	)
 
-	bende_del_viandante = CardDatabase.get_card(
-		CardDatabase.BENDE_DEL_VIANDANTE
+	bende_del_viandante = (
+		CardDatabase.get_card(
+			CardDatabase.BENDE_DEL_VIANDANTE
+		)
 	)
 
-	catena_del_contrappasso = CardDatabase.get_card(
-		CardDatabase.CATENA_DEL_CONTRAPPASSO
+	catena_del_contrappasso = (
+		CardDatabase.get_card(
+			CardDatabase.CATENA_DEL_CONTRAPPASSO
+		)
 	)
 
-	spinta_dei_condannati = CardDatabase.get_card(
-		CardDatabase.SPINTA_DEI_CONDANNATI
+	spinta_dei_condannati = (
+		CardDatabase.get_card(
+			CardDatabase.SPINTA_DEI_CONDANNATI
+		)
 	)
+
+	active_cards = [
+		mannaia_del_carnefice,
+		chiodo_del_giudizio,
+		maglio_della_pena,
+		bende_del_viandante,
+		catena_del_contrappasso,
+		spinta_dei_condannati
+	]
 
 
 func _load_test_enemy() -> void:
@@ -124,6 +154,33 @@ func _load_test_enemy() -> void:
 	)
 
 	enemy.setup(data)
+
+
+func _setup_card_bar() -> void:
+	if not card_bar.has_method(
+		"set_cards"
+	):
+		push_error(
+			"CardBar non espone set_cards()."
+		)
+		return
+
+	card_bar.set_cards(
+		active_cards
+	)
+
+	if not card_bar.card_selected.is_connected(
+		_on_card_selected
+	):
+		card_bar.card_selected.connect(
+			_on_card_selected
+		)
+
+
+func _on_card_selected(
+	card: CardData
+) -> void:
+	_try_use_card(card)
 
 
 func _unhandled_input(
@@ -144,42 +201,6 @@ func _unhandled_input(
 
 			if event.keycode == KEY_E:
 				_select_next_body_part()
-				return
-
-			if event.keycode == KEY_1:
-				_try_use_card(
-					mannaia_del_carnefice
-				)
-				return
-
-			if event.keycode == KEY_2:
-				_try_use_card(
-					chiodo_del_giudizio
-				)
-				return
-
-			if event.keycode == KEY_3:
-				_try_use_card(
-					maglio_della_pena
-				)
-				return
-
-			if event.keycode == KEY_4:
-				_try_use_card(
-					bende_del_viandante
-				)
-				return
-
-			if event.keycode == KEY_5:
-				_try_use_card(
-					catena_del_contrappasso
-				)
-				return
-
-			if event.keycode == KEY_6:
-				_try_use_card(
-					spinta_dei_condannati
-				)
 				return
 
 	if is_moving or enemy_is_moving:
@@ -274,12 +295,17 @@ func _get_player_move_range() -> int:
 	if player_statuses.is_immobilized():
 		return 0
 
-	var result: int = COMBAT_MOVE_RANGE
+	var result: int = (
+		COMBAT_MOVE_RANGE
+	)
 
 	if player_statuses.is_slowed():
 		result -= 1
 
-	return maxi(result, 0)
+	return maxi(
+		result,
+		0
+	)
 
 
 func _handle_grid_click(
@@ -357,7 +383,9 @@ func _move_player_along_path() -> void:
 		)
 	)
 
-	var tween: Tween = create_tween()
+	var tween: Tween = (
+		create_tween()
+	)
 
 	tween.tween_property(
 		player,
@@ -373,56 +401,70 @@ func _move_player_along_path() -> void:
 	)
 
 
-func _try_use_card(
+func _is_card_available(
 	card: CardData
-) -> void:
+) -> bool:
 	if card == null:
-		return
+		return false
 
 	if not combat_mode:
-		return
+		return false
 
 	if player_is_dead:
-		return
+		return false
 
 	if enemy.is_dead():
-		return
+		return false
 
-	if is_moving or enemy_is_moving:
-		return
+	if is_moving:
+		return false
+
+	if enemy_is_moving:
+		return false
 
 	if (
 		player_actions_remaining
 		< card.action_cost
 	):
-		print(
-			card.card_name,
-			": Azioni insufficienti."
-		)
-		return
+		return false
 
 	if card.healing > 0:
-		_try_use_healing_card(card)
-		return
+		return (
+			player_hp
+			< PLAYER_MAX_HP
+		)
 
-	if card.damage > 0:
-		_try_use_attack_card(card)
-		return
+	if card.damage <= 0:
+		return false
 
-
-func _try_use_attack_card(
-	card: CardData
-) -> void:
 	if (
 		"Mira" in card.tags
 		and player_statuses.is_blinded()
 	):
-		print(
-			card.card_name,
-			": Accecato impedisce Mira."
-		)
-		return
+		return false
 
+	var effective_range: int = (
+		_get_effective_card_range(
+			card
+		)
+	)
+
+	var distance: int = (
+		_grid_distance(
+			player_cell,
+			enemy_cell
+		)
+	)
+
+	return (
+		distance
+		<= effective_range
+	)
+
+
+func _get_effective_card_range(
+	card: CardData
+) -> int:
 	var effective_range: int = (
 		card.attack_range
 	)
@@ -436,34 +478,43 @@ func _try_use_attack_card(
 			0
 		)
 
-	var distance: int = (
-		_grid_distance(
-			player_cell,
-			enemy_cell
-		)
+	return effective_range
+
+
+func _refresh_card_bar() -> void:
+	card_bar.visible = (
+		combat_mode
+		and not player_is_dead
+		and not enemy.is_dead()
 	)
 
-	if distance > effective_range:
-		print(
-			card.card_name,
-			": bersaglio fuori portata."
-		)
+	if not card_bar.has_method(
+		"set_card_available"
+	):
 		return
 
-	_use_attack_card(card)
+	for card in active_cards:
+		card_bar.set_card_available(
+			card,
+			_is_card_available(card)
+		)
 
 
-func _try_use_healing_card(
+func _try_use_card(
 	card: CardData
 ) -> void:
-	if player_hp >= PLAYER_MAX_HP:
-		print(
-			card.card_name,
-			": HP già al massimo."
-		)
+	if card == null:
 		return
 
-	_use_healing_card(card)
+	if not _is_card_available(card):
+		return
+
+	if card.healing > 0:
+		_use_healing_card(card)
+		return
+
+	if card.damage > 0:
+		_use_attack_card(card)
 
 
 func _use_attack_card(
@@ -480,6 +531,7 @@ func _use_attack_card(
 			card,
 			modified_damage
 		)
+
 		return
 
 	var damage_done: int = (
@@ -560,7 +612,9 @@ func _use_aimed_attack(
 		result["vitality_damage"]
 	)
 
-	if bool(result["destroyed"]):
+	if bool(
+		result["destroyed"]
+	):
 		print(
 			target_part,
 			" DISTRUTTA"
@@ -615,7 +669,9 @@ func _apply_card_effects(
 func _pull_enemy(
 	pull_distance: int
 ) -> void:
-	for _step in range(pull_distance):
+	for _step in range(
+		pull_distance
+	):
 		grid.remove_occupied_cell(
 			enemy_cell
 		)
@@ -668,7 +724,9 @@ func _push_enemy(
 	push_distance: int,
 	source_card: CardData
 ) -> void:
-	for _step in range(push_distance):
+	for _step in range(
+		push_distance
+	):
 		var direction: Vector2i = (
 			enemy_cell
 			- player_cell
@@ -766,7 +824,8 @@ func _apply_collision_card_effect(
 		return
 
 	if (
-		card.collision_status_to_apply
+		card
+		.collision_status_to_apply
 		.is_empty()
 	):
 		return
@@ -788,9 +847,13 @@ func _apply_collision_card_effect(
 func _use_healing_card(
 	card: CardData
 ) -> void:
-	var old_hp: int = player_hp
+	var old_hp: int = (
+		player_hp
+	)
 
-	player_hp += card.healing
+	player_hp += (
+		card.healing
+	)
 
 	if player_hp > PLAYER_MAX_HP:
 		player_hp = PLAYER_MAX_HP
@@ -959,7 +1022,8 @@ func _start_enemy_turn() -> void:
 
 	if enemy_is_stunned:
 		print(
-			"Il nemico è Stordito: non può avanzare."
+			"Il nemico è Stordito: "
+			+ "non può avanzare."
 		)
 
 		if (
@@ -1026,7 +1090,9 @@ func _start_enemy_turn() -> void:
 		return
 
 	var next_cell: Vector2i = (
-		path[steps_to_move]
+		path[
+			steps_to_move
+		]
 	)
 
 	grid.remove_occupied_cell(
@@ -1046,7 +1112,9 @@ func _start_enemy_turn() -> void:
 		)
 	)
 
-	var tween: Tween = create_tween()
+	var tween: Tween = (
+		create_tween()
+	)
 
 	tween.tween_property(
 		enemy,
@@ -1222,7 +1290,8 @@ func _status_summary_to_text(
 
 func _update_status_labels() -> void:
 	var player_summary: Array[String] = (
-		player_statuses.get_status_summary()
+		player_statuses
+		.get_status_summary()
 	)
 
 	player_status_label.text = (
@@ -1240,7 +1309,8 @@ func _update_status_labels() -> void:
 		return
 
 	var enemy_summary: Array[String] = (
-		enemy.status_manager.get_status_summary()
+		enemy.status_manager
+		.get_status_summary()
 	)
 
 	enemy_status_label.text = (
@@ -1261,9 +1331,13 @@ func _update_ui() -> void:
 
 	actions_label.text = (
 		"Azioni: "
-		+ str(player_actions_remaining)
+		+ str(
+			player_actions_remaining
+		)
 		+ "/"
-		+ str(PLAYER_MAX_ACTIONS)
+		+ str(
+			PLAYER_MAX_ACTIONS
+		)
 	)
 
 	if enemy.is_dead():
@@ -1275,9 +1349,13 @@ func _update_ui() -> void:
 		enemy_hp_label.text = (
 			enemy.get_enemy_name()
 			+ ": "
-			+ str(enemy.get_hp())
+			+ str(
+				enemy.get_hp()
+			)
 			+ "/"
-			+ str(enemy.get_max_hp())
+			+ str(
+				enemy.get_max_hp()
+			)
 			+ " HP"
 		)
 
@@ -1308,6 +1386,7 @@ func _update_ui() -> void:
 		)
 
 	_update_status_labels()
+	_refresh_card_bar()
 
 	if player_is_dead:
 		state_label.text = (
