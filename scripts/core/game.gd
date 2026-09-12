@@ -11,6 +11,14 @@ extends Node2D
 @onready var enemy_hp_label: Label = $UI/HUD/CombatPanel/EnemyHPLabel
 @onready var target_part_label: Label = $UI/HUD/CombatPanel/TargetPartLabel
 
+@onready var player_status_label: Label = (
+	$UI/HUD/CombatPanel/PlayerStatusLabel
+)
+
+@onready var enemy_status_label: Label = (
+	$UI/HUD/CombatPanel/EnemyStatusLabel
+)
+
 
 const MOVE_TIME := 0.12
 const ENEMY_MOVE_TIME := 0.18
@@ -1252,6 +1260,53 @@ func _grid_distance(
 	)
 
 
+func _status_summary_to_text(
+	statuses: Array[String]
+) -> String:
+	if statuses.is_empty():
+		return "Nessuno"
+
+	var result: String = ""
+
+	for index in range(statuses.size()):
+		if index > 0:
+			result += ", "
+
+		result += statuses[index]
+
+	return result
+
+
+func _update_status_labels() -> void:
+	var player_summary: Array[String] = (
+		player_statuses.get_status_summary()
+	)
+
+	player_status_label.text = (
+		"Stati G: "
+		+ _status_summary_to_text(
+			player_summary
+		)
+	)
+
+	if enemy.is_dead():
+		enemy_status_label.text = (
+			"Stati N: -"
+		)
+		return
+
+	var enemy_summary: Array[String] = (
+		enemy.status_manager.get_status_summary()
+	)
+
+	enemy_status_label.text = (
+		"Stati N: "
+		+ _status_summary_to_text(
+			enemy_summary
+		)
+	)
+
+
 func _update_ui() -> void:
 	hp_label.text = (
 		"HP: "
@@ -1305,6 +1360,8 @@ func _update_ui() -> void:
 				)
 			)
 		)
+
+	_update_status_labels()
 
 	if player_is_dead:
 		state_label.text = "MORTO"

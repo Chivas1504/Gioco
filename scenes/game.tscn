@@ -27,7 +27,7 @@ offset_right = 40.0
 offset_bottom = 40.0
 
 [node name="CombatPanel" type="Panel" parent="UI/HUD" unique_id=1667139331]
-custom_minimum_size = Vector2(240, 170)
+custom_minimum_size = Vector2(240, 260)
 custom_maximum_size = Vector2(0, 0)
 layout_mode = 0
 offset_left = 20.0
@@ -74,3 +74,21 @@ offset_top = 130.0
 offset_right = 86.0
 offset_bottom = 260.0
 text = "Mira: Testa"
+
+[node name="PlayerStatusLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=615252701]
+custom_maximum_size = Vector2(220, 40)
+layout_mode = 0
+offset_left = 10.0
+offset_top = 160.0
+offset_right = 230.0
+offset_bottom = 200.0
+autowrap_mode = 3
+
+[node name="EnemyStatusLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1127790825]
+custom_maximum_size = Vector2(220, -1)
+layout_mode = 0
+offset_left = 10.0
+offset_top = 205.0
+offset_right = 230.0
+offset_bottom = 250.0
+autowrap_mode = 3
