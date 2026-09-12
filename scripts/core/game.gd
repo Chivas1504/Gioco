@@ -4,8 +4,6 @@ extends Node2D
 @onready var grid: Node2D = $Grid
 @onready var player: Node2D = $Player
 
-@onready var enemy_one: EnemyUnit = $Enemy
-@onready var enemy_two: EnemyUnit = $Enemy2
 
 @onready var hp_label: Label = $UI/HUD/CombatPanel/HPLabel
 @onready var actions_label: Label = $UI/HUD/CombatPanel/ActionsLabel
@@ -143,56 +141,76 @@ func _load_test_cards() -> void:
 
 
 func _setup_enemies() -> void:
-	enemy_units = [
-		enemy_one,
-		enemy_two
-	]
+	enemy_units.clear()
+	enemy_cells.clear()
 
-	var enemy_one_data: EnemyData = (
-		EnemyDatabase.get_enemy(
-			EnemyDatabase.SENZA_VOLTO
+	var encounter: EncounterData = (
+		EncounterDatabase.get_encounter(
+			EncounterDatabase.LIMBO_TEST
 		)
 	)
 
-	var enemy_two_data: EnemyData = (
-		EnemyDatabase.get_enemy(
-			EnemyDatabase.SENZA_VOLTO
+	if encounter == null:
+		push_error(
+			"Impossibile caricare l'incontro."
 		)
-	)
+		return
 
-	enemy_one.setup(
-		enemy_one_data
-	)
-
-	enemy_two.setup(
-		enemy_two_data
-	)
-
-	enemy_cells[enemy_one] = Vector2i(
-		6,
-		4
-	)
-
-	enemy_cells[enemy_two] = Vector2i(
-		7,
-		7
-	)
-
-	for enemy_unit in enemy_units:
-		var cell: Vector2i = (
-			_get_enemy_cell(
-				enemy_unit
+	for index in range(
+		encounter.get_enemy_count()
+	):
+		var encounter_enemy: EncounterData.EncounterEnemy = (
+			encounter.get_enemy(
+				index
 			)
 		)
+
+		var enemy_data: EnemyData = (
+			EnemyDatabase.get_enemy(
+				encounter_enemy.enemy_id
+			)
+		)
+
+		if enemy_data == null:
+			push_error(
+				"EnemyData non trovato: "
+				+ encounter_enemy.enemy_id
+			)
+			continue
+
+		var enemy_unit: EnemyUnit = (
+			EnemyUnit.new()
+		)
+
+		add_child(
+			enemy_unit
+		)
+
+		enemy_unit.setup(
+			enemy_data
+		)
+
+		enemy_units.append(
+			enemy_unit
+		)
+
+		enemy_cells[
+			enemy_unit
+		] = encounter_enemy.spawn_cell
 
 		enemy_unit.position = (
 			grid.position
 			+ grid.cell_to_local(
-				cell
+				encounter_enemy.spawn_cell
 			)
 		)
 
-	selected_enemy = enemy_one
+	if not enemy_units.is_empty():
+		selected_enemy = (
+			enemy_units[0]
+		)
+	else:
+		selected_enemy = null
 
 
 func _setup_card_bar() -> void:
