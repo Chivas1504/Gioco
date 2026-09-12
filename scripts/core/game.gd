@@ -193,9 +193,6 @@ func _unhandled_input(
 
 	if event is InputEventKey:
 		if event.pressed and not event.echo:
-			if _handle_test_status_key(event):
-				return
-
 			if event.keycode == KEY_C:
 				_toggle_combat_mode()
 				return
@@ -262,121 +259,6 @@ func _unhandled_input(
 			_handle_grid_click(
 				event.position
 			)
-
-
-func _handle_test_status_key(
-	event: InputEventKey
-) -> bool:
-	if not combat_mode:
-		return false
-
-	if is_moving or enemy_is_moving:
-		return false
-
-	match event.keycode:
-		KEY_F1:
-			enemy.status_manager.add_status(
-				StatusManager.BLEEDING,
-				3,
-				1
-			)
-
-			print(
-				"TEST: Sanguinamento nemico"
-			)
-
-		KEY_F2:
-			var part: String = (
-				_get_selected_body_part()
-			)
-
-			enemy.apply_fracture(part)
-
-			print(
-				"TEST: Frattura ",
-				part
-			)
-
-		KEY_F3:
-			enemy.status_manager.add_status(
-				StatusManager.BURN,
-				2
-			)
-
-			print(
-				"TEST: Ustione nemico"
-			)
-
-		KEY_F4:
-			player_statuses.add_status(
-				StatusManager.STUN,
-				1
-			)
-
-			print(
-				"TEST: Stordimento giocatore"
-			)
-
-		KEY_F5:
-			player_statuses.add_status(
-				StatusManager.IMMOBILIZED,
-				1
-			)
-
-			print(
-				"TEST: Immobilizzato giocatore"
-			)
-
-		KEY_F6:
-			player_statuses.add_status(
-				StatusManager.BLINDED,
-				2
-			)
-
-			print(
-				"TEST: Accecato giocatore"
-			)
-
-		KEY_F7:
-			player_statuses.add_status(
-				StatusManager.SLOWED,
-				2
-			)
-
-			print(
-				"TEST: Rallentato giocatore"
-			)
-
-		KEY_F8:
-			enemy.status_manager.add_status(
-				StatusManager.MARKED,
-				-1
-			)
-
-			print(
-				"TEST: Marcato nemico"
-			)
-
-		_:
-			return false
-
-	_print_statuses()
-	_update_combat_display()
-	_update_ui()
-
-	return true
-
-
-func _print_statuses() -> void:
-	print(
-		"Stati nemico: ",
-		enemy.status_manager.get_status_summary()
-	)
-
-	print(
-		"Stati giocatore: ",
-		player_statuses.get_status_summary()
-	)
 
 
 func _select_previous_body_part() -> void:
@@ -676,6 +558,8 @@ func _use_attack_card(
 		_enemy_died()
 		return
 
+	_apply_test_card_status(card)
+
 	if card.pull_distance > 0:
 		_pull_enemy(
 			card.pull_distance
@@ -737,15 +621,72 @@ func _use_aimed_attack(
 			" DISTRUTTA"
 		)
 
-	_update_ui()
-
 	if enemy.is_dead():
+		_update_ui()
 		_enemy_died()
 		return
+
+	_apply_test_card_status(card)
+
+	_update_ui()
 
 	_finish_player_action(
 		card.action_cost
 	)
+
+
+func _apply_test_card_status(
+	card: CardData
+) -> void:
+	match card.card_name:
+		"Mannaia del Carnefice":
+			enemy.status_manager.add_status(
+				StatusManager.BLEEDING,
+				3,
+				1
+			)
+
+			print(
+				"Sanguinamento applicato: ",
+				enemy.status_manager.get_stacks(
+					StatusManager.BLEEDING
+				),
+				" stack."
+			)
+
+		"Chiodo del Giudizio":
+			enemy.status_manager.add_status(
+				StatusManager.MARKED,
+				-1
+			)
+
+			print(
+				"Nemico Marcato."
+			)
+
+		"Maglio della Pena":
+			var target_part: String = (
+				_get_selected_body_part()
+			)
+
+			enemy.apply_fracture(
+				target_part
+			)
+
+			print(
+				"Frattura applicata a: ",
+				target_part
+			)
+
+		"Catena del Contrappasso":
+			enemy.status_manager.add_status(
+				StatusManager.SLOWED,
+				2
+			)
+
+			print(
+				"Nemico Rallentato."
+			)
 
 
 func _pull_enemy(
@@ -770,7 +711,9 @@ func _pull_enemy(
 		if path.size() <= 1:
 			return
 
-		var next_cell: Vector2i = path[1]
+		var next_cell: Vector2i = (
+			path[1]
+		)
 
 		if next_cell == player_cell:
 			return
@@ -831,6 +774,7 @@ func _push_enemy(
 			next_cell
 		):
 			_apply_collision_damage()
+			_apply_collision_stun()
 			return
 
 		grid.remove_occupied_cell(
@@ -869,14 +813,36 @@ func _push_enemy(
 
 
 func _apply_collision_damage() -> void:
-	enemy.take_vitality_damage(
-		COLLISION_DAMAGE
+	var damage_done: int = (
+		enemy.take_vitality_damage(
+			COLLISION_DAMAGE
+		)
+	)
+
+	print(
+		"Collisione: ",
+		damage_done,
+		" danni alla Vitalità."
 	)
 
 	_update_ui()
 
 	if enemy.is_dead():
 		_enemy_died()
+
+
+func _apply_collision_stun() -> void:
+	if enemy.is_dead():
+		return
+
+	enemy.status_manager.add_status(
+		StatusManager.STUN,
+		1
+	)
+
+	print(
+		"Collisione contro ostacolo: nemico Stordito."
+	)
 
 
 func _use_healing_card(
@@ -1044,6 +1010,31 @@ func _start_enemy_turn() -> void:
 		_enemy_died()
 		return
 
+	var enemy_is_stunned: bool = bool(
+		activation.get(
+			"stunned",
+			false
+		)
+	)
+
+	if enemy_is_stunned:
+		print(
+			"Il nemico è Stordito: non può avanzare."
+		)
+
+		if (
+			_grid_distance(
+				enemy_cell,
+				player_cell
+			)
+			== 1
+		):
+			_enemy_attack()
+		else:
+			_finish_enemy_turn()
+
+		return
+
 	var enemy_move_range: int = (
 		enemy.get_move_range(1)
 	)
@@ -1085,7 +1076,9 @@ func _start_enemy_turn() -> void:
 		_enemy_attack()
 		return
 
-	var next_cell: Vector2i = path[1]
+	var next_cell: Vector2i = (
+		path[1]
+	)
 
 	grid.remove_occupied_cell(
 		enemy_cell
