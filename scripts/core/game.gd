@@ -22,8 +22,6 @@ const PLAYER_MAX_HP := 30
 const ENEMY_MAX_HP := 25
 const ENEMY_DAMAGE := 6
 
-const PLAYER_ATTACK_DAMAGE := 8
-
 
 var player_cell: Vector2i = Vector2i(0, 0)
 var enemy_cell: Vector2i = Vector2i(6, 4)
@@ -43,8 +41,12 @@ var player_actions_remaining: int = PLAYER_MAX_ACTIONS
 var player_is_dead: bool = false
 var enemy_is_dead: bool = false
 
+var mannaia_del_carnefice: CardData
+
 
 func _ready() -> void:
+	_create_test_cards()
+
 	player.position = (
 		grid.position
 		+ grid.cell_to_local(player_cell)
@@ -65,6 +67,21 @@ func _ready() -> void:
 	_update_combat_display()
 
 
+func _create_test_cards() -> void:
+	var card_tags: Array[String] = [
+		"Taglio",
+		"Mischia"
+	]
+
+	mannaia_del_carnefice = CardData.new(
+		"Mannaia del Carnefice",
+		1,
+		7,
+		1,
+		card_tags
+	)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if player_is_dead:
 		return
@@ -76,8 +93,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toggle_combat_mode()
 				return
 
-			if event.keycode == KEY_A:
-				_try_player_attack()
+			if event.keycode == KEY_1:
+				_try_use_card(mannaia_del_carnefice)
 				return
 
 	if is_moving or enemy_is_moving:
@@ -136,7 +153,7 @@ func _move_player_along_path() -> void:
 		is_moving = false
 
 		if combat_mode:
-			_finish_player_action()
+			_finish_player_action(1)
 		else:
 			_update_combat_display()
 
@@ -167,7 +184,7 @@ func _move_player_along_path() -> void:
 	)
 
 
-func _try_player_attack() -> void:
+func _try_use_card(card: CardData) -> void:
 	if not combat_mode:
 		return
 
@@ -180,29 +197,38 @@ func _try_player_attack() -> void:
 	if is_moving or enemy_is_moving:
 		return
 
-	if player_actions_remaining <= 0:
+	if player_actions_remaining < card.action_cost:
 		return
 
-	if not _are_cells_adjacent(
+	var distance: int = _grid_distance(
 		player_cell,
 		enemy_cell
-	):
-		print("Il nemico non è adiacente.")
+	)
+
+	if distance > card.attack_range:
+		print(
+			card.card_name,
+			": bersaglio fuori portata."
+		)
 		return
 
-	_player_attack()
+	_use_attack_card(card)
 
 
-func _player_attack() -> void:
-	enemy_hp -= PLAYER_ATTACK_DAMAGE
+func _use_attack_card(card: CardData) -> void:
+	enemy_hp -= card.damage
 
 	if enemy_hp < 0:
 		enemy_hp = 0
 
 	print(
-		"Il Ricucito colpisce per ",
-		PLAYER_ATTACK_DAMAGE,
-		" danni."
+		"Usata carta: ",
+		card.card_name
+	)
+
+	print(
+		"Danno inflitto: ",
+		card.damage
 	)
 
 	_update_ui()
@@ -211,7 +237,7 @@ func _player_attack() -> void:
 		_enemy_died()
 		return
 
-	_finish_player_action()
+	_finish_player_action(card.action_cost)
 
 
 func _enemy_died() -> void:
@@ -231,8 +257,11 @@ func _enemy_died() -> void:
 	_update_ui()
 
 
-func _finish_player_action() -> void:
-	player_actions_remaining -= 1
+func _finish_player_action(action_cost: int) -> void:
+	player_actions_remaining -= action_cost
+
+	if player_actions_remaining < 0:
+		player_actions_remaining = 0
 
 	_update_ui()
 
@@ -367,20 +396,18 @@ func _update_combat_display() -> void:
 		grid.clear_reachable_cells()
 
 
-func _are_cells_adjacent(
+func _grid_distance(
 	first_cell: Vector2i,
 	second_cell: Vector2i
-) -> bool:
+) -> int:
 	var difference: Vector2i = (
 		first_cell - second_cell
 	)
 
-	var distance: int = (
+	return (
 		abs(difference.x)
 		+ abs(difference.y)
 	)
-
-	return distance == 1
 
 
 func _update_ui() -> void:
