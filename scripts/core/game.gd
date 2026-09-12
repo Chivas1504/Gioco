@@ -686,9 +686,7 @@ func _use_attack_card(
 	if selected_enemy == null:
 		return
 
-	var target_enemy: EnemyUnit = (
-		selected_enemy
-	)
+	var target_enemy: EnemyUnit = selected_enemy
 
 	var modified_damage: int = (
 		target_enemy.modify_incoming_attack_damage(
@@ -767,9 +765,7 @@ func _use_aimed_attack(
 	if selected_enemy == null:
 		return
 
-	var target_enemy: EnemyUnit = (
-		selected_enemy
-	)
+	var target_enemy: EnemyUnit = selected_enemy
 
 	var target_part: String = (
 		_get_selected_body_part()
@@ -905,9 +901,7 @@ func _pull_enemy(
 		if path.size() <= 1:
 			return
 
-		var next_cell: Vector2i = (
-			path[1]
-		)
+		var next_cell: Vector2i = path[1]
 
 		if next_cell == player_cell:
 			return
@@ -1145,12 +1139,6 @@ func _begin_player_activation() -> bool:
 		if player_hp < 0:
 			player_hp = 0
 
-		print(
-			"Ustione giocatore: -",
-			burn_damage,
-			" HP"
-		)
-
 	if player_hp <= 0:
 		_player_died()
 		return false
@@ -1162,10 +1150,6 @@ func _begin_player_activation() -> bool:
 		)
 	):
 		player_actions_remaining = 1
-
-		print(
-			"Stordimento: solo 1 Azione."
-		)
 	else:
 		player_actions_remaining = PLAYER_MAX_ACTIONS
 
@@ -1194,12 +1178,6 @@ func _end_player_activation() -> bool:
 
 		if player_hp < 0:
 			player_hp = 0
-
-		print(
-			"Sanguinamento giocatore: -",
-			bleeding_damage,
-			" HP"
-		)
 
 	if player_hp <= 0:
 		_player_died()
@@ -1293,11 +1271,6 @@ func _run_enemy_turn(
 	)
 
 	if enemy_is_stunned:
-		print(
-			enemy_unit.get_enemy_name(),
-			" è Stordito."
-		)
-
 		if (
 			_grid_distance(
 				enemy_cell,
@@ -1338,6 +1311,21 @@ func _run_enemy_turn(
 		)
 	):
 		_enemy_chain_pull(
+			enemy_unit
+		)
+		return
+
+	if (
+		enemy_unit.can_use_special_ability()
+		and enemy_unit.get_special_ability() == "ranged_attack"
+		and distance_to_player >= 2
+		and distance_to_player <= enemy_unit.get_special_range()
+		and _has_clear_straight_line(
+			enemy_cell,
+			player_cell
+		)
+	):
+		_enemy_ranged_attack(
 			enemy_unit
 		)
 		return
@@ -1494,9 +1482,7 @@ func _enemy_chain_pull(
 		enemy_unit.get_special_pull_distance()
 	)
 
-	var final_cell: Vector2i = (
-		player_cell
-	)
+	var final_cell: Vector2i = player_cell
 
 	for _step in range(
 		pull_distance
@@ -1559,6 +1545,41 @@ func _enemy_chain_pull(
 			_finish_single_enemy_turn(
 				enemy_unit
 			)
+	)
+
+
+func _enemy_ranged_attack(
+	enemy_unit: EnemyUnit
+) -> void:
+	var damage: int = (
+		enemy_unit.get_attack_damage()
+	)
+
+	if player_statuses.consume_marked():
+		damage = roundi(
+			damage * 1.25
+		)
+
+	player_hp -= damage
+
+	if player_hp < 0:
+		player_hp = 0
+
+	print(
+		enemy_unit.get_enemy_name(),
+		" usa un attacco a distanza e infligge ",
+		damage,
+		" danni."
+	)
+
+	_update_ui()
+
+	if player_hp <= 0:
+		_player_died()
+		return
+
+	_finish_single_enemy_turn(
+		enemy_unit
 	)
 
 

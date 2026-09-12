@@ -5,6 +5,7 @@ extends RefCounted
 const TEST_ENEMY := "test_enemy"
 const SENZA_VOLTO := "senza_volto"
 const TRASCINATO := "trascinato"
+const VEGLIANTE := "vegliante"
 
 
 static func get_enemy(
@@ -20,6 +21,9 @@ static func get_enemy(
 		TRASCINATO:
 			return _create_trascinato()
 
+		VEGLIANTE:
+			return _create_vegliante()
+
 		_:
 			push_error(
 				"Nemico sconosciuto: "
@@ -33,7 +37,8 @@ static func get_all_enemy_ids() -> Array[String]:
 	return [
 		TEST_ENEMY,
 		SENZA_VOLTO,
-		TRASCINATO
+		TRASCINATO,
+		VEGLIANTE
 	]
 
 
@@ -81,4 +86,22 @@ static func _create_trascinato() -> EnemyData:
 		3,
 		1,
 		"Braccia"
+	)
+
+
+static func _create_vegliante() -> EnemyData:
+	return EnemyData.new(
+		"Il Vegliante",
+		20,
+		4,
+		1,
+		{
+			"Occhio": 10,
+			"Torso": 14,
+			"Braccia": 10
+		},
+		"ranged_attack",
+		5,
+		0,
+		"Occhio"
 	)
