@@ -3,9 +3,7 @@ extends Node2D
 
 
 const RADIUS := 20.0
-const MAX_HP := 25
 
-const BASE_ATTACK_DAMAGE := 6
 const HEAD_BROKEN_ATTACK_DAMAGE := 4
 const ARMS_BROKEN_ATTACK_DAMAGE := 3
 
@@ -23,38 +21,61 @@ const BODY_PART_ORDER: Array[String] = [
 ]
 
 
-var hp: int = MAX_HP
+var enemy_data: EnemyData
+
+var hp: int = 0
 
 var status_manager: StatusManager = (
 	StatusManager.new()
 )
 
-
-var body_parts: Dictionary = {
-	"Testa": {
-		"max_integrity": 10,
-		"integrity": 10,
-		"vitality_transfer": 1.0
-	},
-	"Torso": {
-		"max_integrity": 18,
-		"integrity": 18,
-		"vitality_transfer": 0.80
-	},
-	"Braccia": {
-		"max_integrity": 12,
-		"integrity": 12,
-		"vitality_transfer": 0.65
-	},
-	"Gambe": {
-		"max_integrity": 14,
-		"integrity": 14,
-		"vitality_transfer": 0.60
-	}
-}
+var body_parts: Dictionary = {}
 
 
 func _ready() -> void:
+	queue_redraw()
+
+
+func setup(
+	data: EnemyData
+) -> void:
+	enemy_data = data
+
+	if enemy_data == null:
+		push_error(
+			"EnemyUnit.setup() ha ricevuto dati null."
+		)
+		return
+
+	hp = enemy_data.max_hp
+
+	body_parts = {
+		"Testa": {
+			"max_integrity": enemy_data.head_integrity,
+			"integrity": enemy_data.head_integrity,
+			"vitality_transfer": 1.0
+		},
+		"Torso": {
+			"max_integrity": enemy_data.torso_integrity,
+			"integrity": enemy_data.torso_integrity,
+			"vitality_transfer": 0.80
+		},
+		"Braccia": {
+			"max_integrity": enemy_data.arms_integrity,
+			"integrity": enemy_data.arms_integrity,
+			"vitality_transfer": 0.65
+		},
+		"Gambe": {
+			"max_integrity": enemy_data.legs_integrity,
+			"integrity": enemy_data.legs_integrity,
+			"vitality_transfer": 0.60
+		}
+	}
+
+	status_manager.clear_all()
+
+	visible = true
+
 	queue_redraw()
 
 
@@ -64,6 +85,13 @@ func _draw() -> void:
 		RADIUS,
 		Color(0.85, 0.15, 0.15)
 	)
+
+
+func get_enemy_name() -> String:
+	if enemy_data == null:
+		return "Nemico"
+
+	return enemy_data.enemy_name
 
 
 func get_torso_damage_multiplier() -> float:
@@ -268,7 +296,10 @@ func get_hp() -> int:
 
 
 func get_max_hp() -> int:
-	return MAX_HP
+	if enemy_data == null:
+		return 0
+
+	return enemy_data.max_hp
 
 
 func is_dead() -> bool:
@@ -323,21 +354,22 @@ func is_part_destroyed(
 	)
 
 
-func get_move_range(
-	base_range: int
-) -> int:
+func get_move_range() -> int:
+	if enemy_data == null:
+		return 0
+
 	if is_part_destroyed("Gambe"):
 		return 0
 
 	if status_manager.is_immobilized():
 		return 0
 
-	var result: int = base_range
+	var result: int = (
+		enemy_data.move_range
+	)
 
-	if (
-		status_manager.has_fracture(
-			"Gambe"
-		)
+	if status_manager.has_fracture(
+		"Gambe"
 	):
 		result -= 1
 
@@ -348,23 +380,25 @@ func get_move_range(
 
 
 func can_move() -> bool:
-	return get_move_range(1) > 0
+	return get_move_range() > 0
 
 
 func get_attack_damage() -> int:
+	if enemy_data == null:
+		return 0
+
 	var damage: int = (
-		BASE_ATTACK_DAMAGE
+		enemy_data.attack_damage
 	)
 
 	if is_part_destroyed("Testa"):
-		damage = (
+		damage = mini(
+			damage,
 			HEAD_BROKEN_ATTACK_DAMAGE
 		)
 
-	elif (
-		status_manager.has_fracture(
-			"Testa"
-		)
+	elif status_manager.has_fracture(
+		"Testa"
 	):
 		damage -= 1
 
@@ -374,10 +408,8 @@ func get_attack_damage() -> int:
 			ARMS_BROKEN_ATTACK_DAMAGE
 		)
 
-	elif (
-		status_manager.has_fracture(
-			"Braccia"
-		)
+	elif status_manager.has_fracture(
+		"Braccia"
 	):
 		damage -= 2
 

@@ -64,6 +64,7 @@ var spinta_dei_condannati: CardData
 
 func _ready() -> void:
 	_load_test_cards()
+	_load_test_enemy()
 
 	player.position = (
 		grid.position
@@ -113,6 +114,16 @@ func _load_test_cards() -> void:
 	spinta_dei_condannati = CardDatabase.get_card(
 		CardDatabase.SPINTA_DEI_CONDANNATI
 	)
+
+
+func _load_test_enemy() -> void:
+	var data: EnemyData = (
+		EnemyDatabase.get_enemy(
+			EnemyDatabase.SENZA_VOLTO
+		)
+	)
+
+	enemy.setup(data)
 
 
 func _unhandled_input(
@@ -965,7 +976,7 @@ func _start_enemy_turn() -> void:
 		return
 
 	var enemy_move_range: int = (
-		enemy.get_move_range(1)
+		enemy.get_move_range()
 	)
 
 	if enemy_move_range <= 0:
@@ -1005,8 +1016,17 @@ func _start_enemy_turn() -> void:
 		_enemy_attack()
 		return
 
+	var steps_to_move: int = mini(
+		enemy_move_range,
+		path.size() - 2
+	)
+
+	if steps_to_move <= 0:
+		_finish_enemy_turn()
+		return
+
 	var next_cell: Vector2i = (
-		path[1]
+		path[steps_to_move]
 	)
 
 	grid.remove_occupied_cell(
@@ -1248,11 +1268,13 @@ func _update_ui() -> void:
 
 	if enemy.is_dead():
 		enemy_hp_label.text = (
-			"Nemico: MORTO"
+			enemy.get_enemy_name()
+			+ ": MORTO"
 		)
 	else:
 		enemy_hp_label.text = (
-			"Nemico: "
+			enemy.get_enemy_name()
+			+ ": "
 			+ str(enemy.get_hp())
 			+ "/"
 			+ str(enemy.get_max_hp())
