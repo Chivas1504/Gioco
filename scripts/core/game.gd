@@ -45,6 +45,7 @@ var mannaia_del_carnefice: CardData
 var chiodo_del_giudizio: CardData
 var maglio_della_pena: CardData
 var bende_del_viandante: CardData
+var catena_del_contrappasso: CardData
 
 
 func _ready() -> void:
@@ -53,7 +54,10 @@ func _ready() -> void:
 	player.position = grid.position + grid.cell_to_local(player_cell)
 	enemy.position = grid.position + grid.cell_to_local(enemy_cell)
 
-	var occupied: Array[Vector2i] = [enemy_cell]
+	var occupied: Array[Vector2i] = [
+		enemy_cell
+	]
+
 	grid.set_occupied_cells(occupied)
 
 	_update_ui()
@@ -72,6 +76,7 @@ func _create_test_cards() -> void:
 		7,
 		0,
 		1,
+		0,
 		mannaia_tags
 	)
 
@@ -87,6 +92,7 @@ func _create_test_cards() -> void:
 		6,
 		0,
 		5,
+		0,
 		chiodo_tags
 	)
 
@@ -102,6 +108,7 @@ func _create_test_cards() -> void:
 		10,
 		0,
 		1,
+		0,
 		maglio_tags
 	)
 
@@ -116,7 +123,25 @@ func _create_test_cards() -> void:
 		0,
 		6,
 		0,
+		0,
 		bende_tags
+	)
+
+	var catena_tags: Array[String] = [
+		"Impatto",
+		"Distanza",
+		"Controllo",
+		"Tiro"
+	]
+
+	catena_del_contrappasso = CardData.new(
+		"Catena del Contrappasso",
+		1,
+		4,
+		0,
+		3,
+		1,
+		catena_tags
 	)
 
 
@@ -146,6 +171,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_try_use_card(bende_del_viandante)
 				return
 
+			if event.keycode == KEY_5:
+				_try_use_card(catena_del_contrappasso)
+				return
+
 	if is_moving or enemy_is_moving:
 		return
 
@@ -153,7 +182,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if (
+			event.button_index == MOUSE_BUTTON_LEFT
+			and event.pressed
+		):
 			_handle_grid_click(event.position)
 
 
@@ -201,8 +233,10 @@ func _move_player_along_path() -> void:
 	is_moving = true
 
 	var next_cell: Vector2i = current_path.pop_front()
+
 	var target_position: Vector2 = (
-		grid.position + grid.cell_to_local(next_cell)
+		grid.position
+		+ grid.cell_to_local(next_cell)
 	)
 
 	var tween: Tween = create_tween()
@@ -293,18 +327,58 @@ func _use_attack_card(card: CardData) -> void:
 		card.damage
 	)
 
-	print(
-		"Costo Azioni: ",
-		card.action_cost
-	)
-
-	_update_ui()
-
 	if enemy_hp <= 0:
+		_update_ui()
 		_enemy_died()
 		return
 
+	if card.pull_distance > 0:
+		_pull_enemy(card.pull_distance)
+
+	_update_ui()
+
 	_finish_player_action(card.action_cost)
+
+
+func _pull_enemy(pull_distance: int) -> void:
+	for step in range(pull_distance):
+		grid.remove_occupied_cell(enemy_cell)
+
+		var path: Array[Vector2i] = grid.find_path(
+			enemy_cell,
+			player_cell
+		)
+
+		grid.add_occupied_cell(enemy_cell)
+
+		if path.size() <= 1:
+			return
+
+		var next_cell: Vector2i = path[1]
+
+		if next_cell == player_cell:
+			print("Il nemico non può essere trascinato oltre.")
+			return
+
+		if not grid.is_cell_walkable(next_cell):
+			print("Il tiro della catena è bloccato.")
+			return
+
+		grid.remove_occupied_cell(enemy_cell)
+
+		enemy_cell = next_cell
+
+		grid.add_occupied_cell(enemy_cell)
+
+		enemy.position = (
+			grid.position
+			+ grid.cell_to_local(enemy_cell)
+		)
+
+		print(
+			"Nemico trascinato nella cella ",
+			enemy_cell
+		)
 
 
 func _use_healing_card(card: CardData) -> void:
@@ -325,11 +399,6 @@ func _use_healing_card(card: CardData) -> void:
 	print(
 		"HP recuperati: ",
 		healed_amount
-	)
-
-	print(
-		"Costo Azioni: ",
-		card.action_cost
 	)
 
 	_update_ui()
@@ -402,7 +471,8 @@ func _start_enemy_turn() -> void:
 	grid.add_occupied_cell(enemy_cell)
 
 	var target_position: Vector2 = (
-		grid.position + grid.cell_to_local(enemy_cell)
+		grid.position
+		+ grid.cell_to_local(enemy_cell)
 	)
 
 	var tween: Tween = create_tween()
@@ -530,11 +600,15 @@ func _update_ui() -> void:
 
 	if player_is_dead:
 		state_label.text = "MORTO"
+
 	elif enemy_is_dead:
 		state_label.text = "COMBATTIMENTO TERMINATO"
+
 	elif enemy_is_moving:
 		state_label.text = "TURNO NEMICO"
+
 	elif combat_mode:
 		state_label.text = "TURNO GIOCATORE"
+
 	else:
 		state_label.text = "ESPLORAZIONE"
