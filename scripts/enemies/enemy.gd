@@ -172,3 +172,14 @@ func is_part_destroyed(
 		get_part_integrity(part_name)
 		<= 0
 	)
+
+
+func can_move() -> bool:
+	return not is_part_destroyed("Gambe")
+
+
+func get_attack_damage() -> int:
+	if is_part_destroyed("Braccia"):
+		return 3
+
+	return 6

@@ -19,7 +19,6 @@ const COMBAT_MOVE_RANGE := 2
 const PLAYER_MAX_ACTIONS := 2
 
 const PLAYER_MAX_HP := 30
-const ENEMY_DAMAGE := 6
 
 const COLLISION_DAMAGE := 2
 
@@ -176,7 +175,9 @@ func _create_test_cards() -> void:
 	)
 
 
-func _unhandled_input(event: InputEvent) -> void:
+func _unhandled_input(
+	event: InputEvent
+) -> void:
 	if player_is_dead:
 		return
 
@@ -290,7 +291,10 @@ func _select_next_body_part() -> void:
 
 	selected_body_part_index += 1
 
-	if selected_body_part_index >= parts.size():
+	if (
+		selected_body_part_index
+		>= parts.size()
+	):
 		selected_body_part_index = 0
 
 	_update_ui()
@@ -304,7 +308,10 @@ func _get_selected_body_part() -> String:
 	if parts.is_empty():
 		return ""
 
-	if selected_body_part_index >= parts.size():
+	if (
+		selected_body_part_index
+		>= parts.size()
+	):
 		selected_body_part_index = 0
 
 	return parts[selected_body_part_index]
@@ -602,17 +609,11 @@ func _pull_enemy(
 		)
 
 		if next_cell == player_cell:
-			print(
-				"Il nemico non può essere trascinato oltre."
-			)
 			return
 
 		if not grid.is_cell_walkable(
 			next_cell
 		):
-			print(
-				"Il tiro della catena è bloccato."
-			)
 			return
 
 		grid.remove_occupied_cell(
@@ -781,6 +782,28 @@ func _start_enemy_turn() -> void:
 	if enemy.is_dead():
 		return
 
+	if not enemy.can_move():
+		enemy_is_moving = true
+
+		_update_ui()
+
+		print(
+			"Le Gambe del nemico sono distrutte."
+		)
+
+		if (
+			_grid_distance(
+				enemy_cell,
+				player_cell
+			)
+			== 1
+		):
+			_enemy_attack()
+		else:
+			_finish_enemy_turn()
+
+		return
+
 	enemy_is_moving = true
 
 	_update_ui()
@@ -845,10 +868,27 @@ func _start_enemy_turn() -> void:
 
 
 func _enemy_attack() -> void:
-	player_hp -= ENEMY_DAMAGE
+	var damage: int = (
+		enemy.get_attack_damage()
+	)
+
+	player_hp -= damage
 
 	if player_hp < 0:
 		player_hp = 0
+
+	print(
+		"Il nemico infligge ",
+		damage,
+		" danni."
+	)
+
+	if enemy.is_part_destroyed(
+		"Braccia"
+	):
+		print(
+			"Le Braccia distrutte riducono la forza dell'attacco."
+		)
 
 	_update_ui()
 
