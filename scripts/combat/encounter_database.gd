@@ -34,7 +34,7 @@ static func _create_limbo_test() -> EncounterData:
 
 	encounter.add_enemy(
 		EnemyDatabase.TRASCINATO,
-		Vector2i(7, 7)
+		Vector2i(3, 0	)
 	)
 
 	return encounter

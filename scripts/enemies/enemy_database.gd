@@ -76,5 +76,9 @@ static func _create_trascinato() -> EnemyData:
 			"Torso": 16,
 			"Braccia": 14,
 			"Gambe": 12
-		}
+		},
+		"chain_pull",
+		3,
+		1,
+		"Braccia"
 	)

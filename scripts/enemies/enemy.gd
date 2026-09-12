@@ -350,6 +350,41 @@ func get_attack_damage() -> int:
 		0
 	)
 
+func get_special_ability() -> String:
+	if enemy_data == null:
+		return ""
+
+	return enemy_data.special_ability
+
+
+func get_special_range() -> int:
+	if enemy_data == null:
+		return 0
+
+	return enemy_data.special_range
+
+
+func get_special_pull_distance() -> int:
+	if enemy_data == null:
+		return 0
+
+	return enemy_data.special_pull_distance
+
+
+func can_use_special_ability() -> bool:
+	if enemy_data == null:
+		return false
+
+	if enemy_data.special_ability.is_empty():
+		return false
+
+	if not enemy_data.special_required_part.is_empty():
+		if _is_part_destroyed(
+			enemy_data.special_required_part
+		):
+			return false
+
+	return true
 
 func _is_part_destroyed(
 	part_name: String
