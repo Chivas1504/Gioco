@@ -42,6 +42,7 @@ var player_is_dead: bool = false
 var enemy_is_dead: bool = false
 
 var mannaia_del_carnefice: CardData
+var chiodo_del_giudizio: CardData
 
 
 func _ready() -> void:
@@ -68,7 +69,7 @@ func _ready() -> void:
 
 
 func _create_test_cards() -> void:
-	var card_tags: Array[String] = [
+	var mannaia_tags: Array[String] = [
 		"Taglio",
 		"Mischia"
 	]
@@ -78,7 +79,21 @@ func _create_test_cards() -> void:
 		1,
 		7,
 		1,
-		card_tags
+		mannaia_tags
+	)
+
+	var chiodo_tags: Array[String] = [
+		"Perforazione",
+		"Distanza",
+		"Mira"
+	]
+
+	chiodo_del_giudizio = CardData.new(
+		"Chiodo del Giudizio",
+		1,
+		6,
+		5,
+		chiodo_tags
 	)
 
 
@@ -95,6 +110,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 			if event.keycode == KEY_1:
 				_try_use_card(mannaia_del_carnefice)
+				return
+
+			if event.keycode == KEY_2:
+				_try_use_card(chiodo_del_giudizio)
 				return
 
 	if is_moving or enemy_is_moving:
