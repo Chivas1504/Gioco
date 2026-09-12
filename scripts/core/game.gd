@@ -114,6 +114,7 @@ func _load_test_cards() -> void:
 		CardDatabase.SPINTA_DEI_CONDANNATI
 	)
 
+
 func _unhandled_input(
 	event: InputEvent
 ) -> void:
@@ -364,6 +365,9 @@ func _move_player_along_path() -> void:
 func _try_use_card(
 	card: CardData
 ) -> void:
+	if card == null:
+		return
+
 	if not combat_mode:
 		return
 
@@ -487,7 +491,7 @@ func _use_attack_card(
 		_enemy_died()
 		return
 
-	_apply_test_card_status(card)
+	_apply_card_effects(card)
 
 	if card.pull_distance > 0:
 		_pull_enemy(
@@ -496,7 +500,8 @@ func _use_attack_card(
 
 	if card.push_distance > 0:
 		_push_enemy(
-			card.push_distance
+			card.push_distance,
+			card
 		)
 
 	if enemy.is_dead():
@@ -555,7 +560,7 @@ func _use_aimed_attack(
 		_enemy_died()
 		return
 
-	_apply_test_card_status(card)
+	_apply_card_effects(card)
 
 	_update_ui()
 
@@ -564,58 +569,36 @@ func _use_aimed_attack(
 	)
 
 
-func _apply_test_card_status(
+func _apply_card_effects(
 	card: CardData
 ) -> void:
-	match card.card_name:
-		"Mannaia del Carnefice":
-			enemy.status_manager.add_status(
-				StatusManager.BLEEDING,
-				3,
-				1
-			)
+	if not card.status_to_apply.is_empty():
+		enemy.status_manager.add_status(
+			card.status_to_apply,
+			card.status_duration,
+			card.status_stacks
+		)
 
-			print(
-				"Sanguinamento applicato: ",
-				enemy.status_manager.get_stacks(
-					StatusManager.BLEEDING
-				),
-				" stack."
-			)
+		print(
+			"Stato applicato: ",
+			card.status_to_apply
+		)
 
-		"Chiodo del Giudizio":
-			enemy.status_manager.add_status(
-				StatusManager.MARKED,
-				-1
-			)
+	if card.fracture_selected_part:
+		var target_part: String = (
+			_get_selected_body_part()
+		)
 
-			print(
-				"Nemico Marcato."
-			)
+		enemy.apply_fracture(
+			target_part
+		)
 
-		"Maglio della Pena":
-			var target_part: String = (
-				_get_selected_body_part()
-			)
+		print(
+			"Frattura applicata a: ",
+			target_part
+		)
 
-			enemy.apply_fracture(
-				target_part
-			)
-
-			print(
-				"Frattura applicata a: ",
-				target_part
-			)
-
-		"Catena del Contrappasso":
-			enemy.status_manager.add_status(
-				StatusManager.SLOWED,
-				2
-			)
-
-			print(
-				"Nemico Rallentato."
-			)
+	_update_ui()
 
 
 func _pull_enemy(
@@ -671,7 +654,8 @@ func _pull_enemy(
 
 
 func _push_enemy(
-	push_distance: int
+	push_distance: int,
+	source_card: CardData
 ) -> void:
 	for _step in range(push_distance):
 		var direction: Vector2i = (
@@ -703,7 +687,11 @@ func _push_enemy(
 			next_cell
 		):
 			_apply_collision_damage()
-			_apply_collision_stun()
+
+			_apply_collision_card_effect(
+				source_card
+			)
+
 			return
 
 		grid.remove_occupied_cell(
@@ -760,18 +748,30 @@ func _apply_collision_damage() -> void:
 		_enemy_died()
 
 
-func _apply_collision_stun() -> void:
+func _apply_collision_card_effect(
+	card: CardData
+) -> void:
 	if enemy.is_dead():
 		return
 
+	if (
+		card.collision_status_to_apply
+		.is_empty()
+	):
+		return
+
 	enemy.status_manager.add_status(
-		StatusManager.STUN,
-		1
+		card.collision_status_to_apply,
+		card.collision_status_duration,
+		card.collision_status_stacks
 	)
 
 	print(
-		"Collisione contro ostacolo: nemico Stordito."
+		"Collisione: applicato ",
+		card.collision_status_to_apply
 	)
+
+	_update_ui()
 
 
 func _use_healing_card(
@@ -1189,7 +1189,9 @@ func _status_summary_to_text(
 
 	var result: String = ""
 
-	for index in range(statuses.size()):
+	for index in range(
+		statuses.size()
+	):
 		if index > 0:
 			result += ", "
 
@@ -1214,6 +1216,7 @@ func _update_status_labels() -> void:
 		enemy_status_label.text = (
 			"Stati N: -"
 		)
+
 		return
 
 	var enemy_summary: Array[String] = (
@@ -1285,7 +1288,9 @@ func _update_ui() -> void:
 	_update_status_labels()
 
 	if player_is_dead:
-		state_label.text = "MORTO"
+		state_label.text = (
+			"MORTO"
+		)
 
 	elif enemy.is_dead():
 		state_label.text = (
