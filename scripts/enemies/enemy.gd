@@ -9,7 +9,11 @@ const BASE_ATTACK_DAMAGE := 6
 const HEAD_BROKEN_ATTACK_DAMAGE := 4
 const ARMS_BROKEN_ATTACK_DAMAGE := 3
 
-const TORSO_DAMAGE_MULTIPLIER := 1.25
+const TORSO_DESTROYED_MULTIPLIER := 1.25
+const TORSO_FRACTURED_MULTIPLIER := 1.10
+
+const MARKED_DAMAGE_MULTIPLIER := 1.25
+
 
 const BODY_PART_ORDER: Array[String] = [
 	"Testa",
@@ -20,6 +24,10 @@ const BODY_PART_ORDER: Array[String] = [
 
 
 var hp: int = MAX_HP
+
+var status_manager: StatusManager = (
+	StatusManager.new()
+)
 
 
 var body_parts: Dictionary = {
@@ -58,23 +66,33 @@ func _draw() -> void:
 	)
 
 
+func get_torso_damage_multiplier() -> float:
+	if is_part_destroyed("Torso"):
+		return TORSO_DESTROYED_MULTIPLIER
+
+	if status_manager.has_fracture("Torso"):
+		return TORSO_FRACTURED_MULTIPLIER
+
+	return 1.0
+
+
 func take_vitality_damage(
 	amount: int,
-	apply_torso_bonus: bool = true
+	torso_multiplier_override: float = 0.0
 ) -> int:
 	if amount <= 0:
 		return 0
 
-	var final_damage: int = amount
+	var multiplier: float = (
+		get_torso_damage_multiplier()
+	)
 
-	if (
-		apply_torso_bonus
-		and is_part_destroyed("Torso")
-	):
-		final_damage = roundi(
-			final_damage
-			* TORSO_DAMAGE_MULTIPLIER
-		)
+	if torso_multiplier_override > 0.0:
+		multiplier = torso_multiplier_override
+
+	var final_damage: int = roundi(
+		amount * multiplier
+	)
 
 	var old_hp: int = hp
 
@@ -84,6 +102,21 @@ func take_vitality_damage(
 		hp = 0
 
 	return old_hp - hp
+
+
+func modify_incoming_attack_damage(
+	amount: int
+) -> int:
+	if amount <= 0:
+		return 0
+
+	if status_manager.consume_marked():
+		return roundi(
+			amount
+			* MARKED_DAMAGE_MULTIPLIER
+		)
+
+	return amount
 
 
 func take_part_damage(
@@ -102,13 +135,13 @@ func take_part_damage(
 	if not body_parts.has(part_name):
 		return result
 
-	# Serve per evitare che il colpo che distrugge
-	# il Torso riceva già il bonus del +25%.
-	var torso_was_destroyed: bool = (
-		is_part_destroyed("Torso")
+	var torso_multiplier_before: float = (
+		get_torso_damage_multiplier()
 	)
 
-	var part: Dictionary = body_parts[part_name]
+	var part: Dictionary = body_parts[
+		part_name
+	]
 
 	var old_integrity: int = int(
 		part["integrity"]
@@ -132,20 +165,100 @@ func take_part_damage(
 		part["vitality_transfer"]
 	)
 
-	var requested_vitality_damage: int = roundi(
-		actual_part_damage * transfer
+	var requested_vitality_damage: int = (
+		roundi(
+			actual_part_damage
+			* transfer
+		)
 	)
 
 	var actual_vitality_damage: int = (
 		take_vitality_damage(
 			requested_vitality_damage,
-			torso_was_destroyed
+			torso_multiplier_before
 		)
 	)
 
-	result["part_damage"] = actual_part_damage
-	result["vitality_damage"] = actual_vitality_damage
-	result["destroyed"] = new_integrity <= 0
+	result["part_damage"] = (
+		actual_part_damage
+	)
+
+	result["vitality_damage"] = (
+		actual_vitality_damage
+	)
+
+	result["destroyed"] = (
+		new_integrity <= 0
+	)
+
+	return result
+
+
+func apply_fracture(
+	part_name: String
+) -> void:
+	if not body_parts.has(part_name):
+		return
+
+	status_manager.add_fracture(
+		part_name
+	)
+
+
+func begin_activation() -> Dictionary:
+	var result: Dictionary = (
+		status_manager.begin_activation()
+	)
+
+	var burn_damage: int = int(
+		result.get(
+			"burn_damage",
+			0
+		)
+	)
+
+	if burn_damage > 0:
+		var applied: int = (
+			take_vitality_damage(
+				burn_damage
+			)
+		)
+
+		result["burn_damage_applied"] = (
+			applied
+		)
+	else:
+		result["burn_damage_applied"] = 0
+
+	return result
+
+
+func end_activation() -> Dictionary:
+	var result: Dictionary = (
+		status_manager.end_activation()
+	)
+
+	var bleeding_damage: int = int(
+		result.get(
+			"bleeding_damage",
+			0
+		)
+	)
+
+	if bleeding_damage > 0:
+		var applied: int = (
+			take_vitality_damage(
+				bleeding_damage
+			)
+		)
+
+		result[
+			"bleeding_damage_applied"
+		] = applied
+	else:
+		result[
+			"bleeding_damage_applied"
+		] = 0
 
 	return result
 
@@ -177,7 +290,9 @@ func get_part_integrity(
 	if not body_parts.has(part_name):
 		return 0
 
-	var part: Dictionary = body_parts[part_name]
+	var part: Dictionary = body_parts[
+		part_name
+	]
 
 	return int(
 		part["integrity"]
@@ -190,7 +305,9 @@ func get_part_max_integrity(
 	if not body_parts.has(part_name):
 		return 0
 
-	var part: Dictionary = body_parts[part_name]
+	var part: Dictionary = body_parts[
+		part_name
+	]
 
 	return int(
 		part["max_integrity"]
@@ -206,17 +323,62 @@ func is_part_destroyed(
 	)
 
 
+func get_move_range(
+	base_range: int
+) -> int:
+	if is_part_destroyed("Gambe"):
+		return 0
+
+	if status_manager.is_immobilized():
+		return 0
+
+	var result: int = base_range
+
+	if (
+		status_manager.has_fracture(
+			"Gambe"
+		)
+	):
+		result -= 1
+
+	if status_manager.is_slowed():
+		result -= 1
+
+	return maxi(result, 0)
+
+
 func can_move() -> bool:
-	return not is_part_destroyed("Gambe")
+	return get_move_range(1) > 0
 
 
 func get_attack_damage() -> int:
-	var damage: int = BASE_ATTACK_DAMAGE
+	var damage: int = (
+		BASE_ATTACK_DAMAGE
+	)
 
 	if is_part_destroyed("Testa"):
-		damage = HEAD_BROKEN_ATTACK_DAMAGE
+		damage = (
+			HEAD_BROKEN_ATTACK_DAMAGE
+		)
+
+	elif (
+		status_manager.has_fracture(
+			"Testa"
+		)
+	):
+		damage -= 1
 
 	if is_part_destroyed("Braccia"):
-		damage = ARMS_BROKEN_ATTACK_DAMAGE
+		damage = mini(
+			damage,
+			ARMS_BROKEN_ATTACK_DAMAGE
+		)
 
-	return damage
+	elif (
+		status_manager.has_fracture(
+			"Braccia"
+		)
+	):
+		damage -= 2
+
+	return maxi(damage, 1)

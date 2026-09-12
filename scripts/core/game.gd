@@ -19,7 +19,6 @@ const COMBAT_MOVE_RANGE := 2
 const PLAYER_MAX_ACTIONS := 2
 
 const PLAYER_MAX_HP := 30
-
 const COLLISION_DAMAGE := 2
 
 
@@ -28,13 +27,20 @@ var enemy_cell: Vector2i = Vector2i(6, 4)
 
 var player_hp: int = PLAYER_MAX_HP
 
+var player_statuses: StatusManager = (
+	StatusManager.new()
+)
+
 var current_path: Array[Vector2i] = []
 
 var is_moving: bool = false
 var enemy_is_moving: bool = false
 var combat_mode: bool = false
 
-var player_actions_remaining: int = PLAYER_MAX_ACTIONS
+var player_actions_remaining: int = (
+	PLAYER_MAX_ACTIONS
+)
+
 var player_is_dead: bool = false
 
 var selected_body_part_index: int = 0
@@ -53,12 +59,16 @@ func _ready() -> void:
 
 	player.position = (
 		grid.position
-		+ grid.cell_to_local(player_cell)
+		+ grid.cell_to_local(
+			player_cell
+		)
 	)
 
 	enemy.position = (
 		grid.position
-		+ grid.cell_to_local(enemy_cell)
+		+ grid.cell_to_local(
+			enemy_cell
+		)
 	)
 
 	var occupied: Array[Vector2i] = [
@@ -183,6 +193,9 @@ func _unhandled_input(
 
 	if event is InputEventKey:
 		if event.pressed and not event.echo:
+			if _handle_test_status_key(event):
+				return
+
 			if event.keycode == KEY_C:
 				_toggle_combat_mode()
 				return
@@ -251,6 +264,121 @@ func _unhandled_input(
 			)
 
 
+func _handle_test_status_key(
+	event: InputEventKey
+) -> bool:
+	if not combat_mode:
+		return false
+
+	if is_moving or enemy_is_moving:
+		return false
+
+	match event.keycode:
+		KEY_F1:
+			enemy.status_manager.add_status(
+				StatusManager.BLEEDING,
+				3,
+				1
+			)
+
+			print(
+				"TEST: Sanguinamento nemico"
+			)
+
+		KEY_F2:
+			var part: String = (
+				_get_selected_body_part()
+			)
+
+			enemy.apply_fracture(part)
+
+			print(
+				"TEST: Frattura ",
+				part
+			)
+
+		KEY_F3:
+			enemy.status_manager.add_status(
+				StatusManager.BURN,
+				2
+			)
+
+			print(
+				"TEST: Ustione nemico"
+			)
+
+		KEY_F4:
+			player_statuses.add_status(
+				StatusManager.STUN,
+				1
+			)
+
+			print(
+				"TEST: Stordimento giocatore"
+			)
+
+		KEY_F5:
+			player_statuses.add_status(
+				StatusManager.IMMOBILIZED,
+				1
+			)
+
+			print(
+				"TEST: Immobilizzato giocatore"
+			)
+
+		KEY_F6:
+			player_statuses.add_status(
+				StatusManager.BLINDED,
+				2
+			)
+
+			print(
+				"TEST: Accecato giocatore"
+			)
+
+		KEY_F7:
+			player_statuses.add_status(
+				StatusManager.SLOWED,
+				2
+			)
+
+			print(
+				"TEST: Rallentato giocatore"
+			)
+
+		KEY_F8:
+			enemy.status_manager.add_status(
+				StatusManager.MARKED,
+				-1
+			)
+
+			print(
+				"TEST: Marcato nemico"
+			)
+
+		_:
+			return false
+
+	_print_statuses()
+	_update_combat_display()
+	_update_ui()
+
+	return true
+
+
+func _print_statuses() -> void:
+	print(
+		"Stati nemico: ",
+		enemy.status_manager.get_status_summary()
+	)
+
+	print(
+		"Stati giocatore: ",
+		player_statuses.get_status_summary()
+	)
+
+
 func _select_previous_body_part() -> void:
 	if not combat_mode:
 		return
@@ -314,7 +442,21 @@ func _get_selected_body_part() -> String:
 	):
 		selected_body_part_index = 0
 
-	return parts[selected_body_part_index]
+	return parts[
+		selected_body_part_index
+	]
+
+
+func _get_player_move_range() -> int:
+	if player_statuses.is_immobilized():
+		return 0
+
+	var result: int = COMBAT_MOVE_RANGE
+
+	if player_statuses.is_slowed():
+		result -= 1
+
+	return maxi(result, 0)
 
 
 func _handle_grid_click(
@@ -355,7 +497,11 @@ func _handle_grid_click(
 			path.size() - 1
 		)
 
-		if distance > COMBAT_MOVE_RANGE:
+		var move_range: int = (
+			_get_player_move_range()
+		)
+
+		if distance > move_range:
 			return
 
 	current_path = path
@@ -441,6 +587,29 @@ func _try_use_card(
 func _try_use_attack_card(
 	card: CardData
 ) -> void:
+	if (
+		"Mira" in card.tags
+		and player_statuses.is_blinded()
+	):
+		print(
+			card.card_name,
+			": Accecato impedisce Mira."
+		)
+		return
+
+	var effective_range: int = (
+		card.attack_range
+	)
+
+	if (
+		"Distanza" in card.tags
+		and player_statuses.is_blinded()
+	):
+		effective_range = maxi(
+			effective_range - 2,
+			0
+		)
+
 	var distance: int = (
 		_grid_distance(
 			player_cell,
@@ -448,7 +617,7 @@ func _try_use_attack_card(
 		)
 	)
 
-	if distance > card.attack_range:
+	if distance > effective_range:
 		print(
 			card.card_name,
 			": bersaglio fuori portata."
@@ -474,13 +643,22 @@ func _try_use_healing_card(
 func _use_attack_card(
 	card: CardData
 ) -> void:
+	var modified_damage: int = (
+		enemy.modify_incoming_attack_damage(
+			card.damage
+		)
+	)
+
 	if "Mira" in card.tags:
-		_use_aimed_attack(card)
+		_use_aimed_attack(
+			card,
+			modified_damage
+		)
 		return
 
 	var damage_done: int = (
 		enemy.take_vitality_damage(
-			card.damage
+			modified_damage
 		)
 	)
 
@@ -490,12 +668,11 @@ func _use_attack_card(
 	)
 
 	print(
-		"Danno alla Vitalità: ",
+		"Danno Vitalità: ",
 		damage_done
 	)
 
 	if enemy.is_dead():
-		_update_ui()
 		_enemy_died()
 		return
 
@@ -520,7 +697,8 @@ func _use_attack_card(
 
 
 func _use_aimed_attack(
-	card: CardData
+	card: CardData,
+	damage: int
 ) -> void:
 	var target_part: String = (
 		_get_selected_body_part()
@@ -529,20 +707,8 @@ func _use_aimed_attack(
 	var result: Dictionary = (
 		enemy.take_part_damage(
 			target_part,
-			card.damage
+			damage
 		)
-	)
-
-	var part_damage: int = int(
-		result["part_damage"]
-	)
-
-	var vitality_damage: int = int(
-		result["vitality_damage"]
-	)
-
-	var destroyed: bool = bool(
-		result["destroyed"]
 	)
 
 	print(
@@ -557,15 +723,15 @@ func _use_aimed_attack(
 
 	print(
 		"Danno Integrità: ",
-		part_damage
+		result["part_damage"]
 	)
 
 	print(
 		"Danno Vitalità trasferito: ",
-		vitality_damage
+		result["vitality_damage"]
 	)
 
-	if destroyed:
+	if bool(result["destroyed"]):
 		print(
 			target_part,
 			" DISTRUTTA"
@@ -604,9 +770,7 @@ func _pull_enemy(
 		if path.size() <= 1:
 			return
 
-		var next_cell: Vector2i = (
-			path[1]
-		)
+		var next_cell: Vector2i = path[1]
 
 		if next_cell == player_cell:
 			return
@@ -746,19 +910,6 @@ func _use_healing_card(
 	)
 
 
-func _enemy_died() -> void:
-	grid.remove_occupied_cell(
-		enemy_cell
-	)
-
-	enemy.visible = false
-	combat_mode = false
-
-	grid.clear_reachable_cells()
-
-	_update_ui()
-
-
 func _finish_player_action(
 	action_cost: int
 ) -> void:
@@ -773,24 +924,131 @@ func _finish_player_action(
 
 	if player_actions_remaining <= 0:
 		grid.clear_reachable_cells()
+
+		if not _end_player_activation():
+			return
+
 		_start_enemy_turn()
 	else:
 		_update_combat_display()
+
+
+func _begin_player_activation() -> bool:
+	var result: Dictionary = (
+		player_statuses.begin_activation()
+	)
+
+	var burn_damage: int = int(
+		result.get(
+			"burn_damage",
+			0
+		)
+	)
+
+	if burn_damage > 0:
+		player_hp -= burn_damage
+
+		if player_hp < 0:
+			player_hp = 0
+
+		print(
+			"Ustione giocatore: -",
+			burn_damage,
+			" HP"
+		)
+
+	if player_hp <= 0:
+		_player_died()
+		return false
+
+	if bool(
+		result.get(
+			"stunned",
+			false
+		)
+	):
+		player_actions_remaining = 1
+
+		print(
+			"Stordimento: solo 1 Azione."
+		)
+	else:
+		player_actions_remaining = (
+			PLAYER_MAX_ACTIONS
+		)
+
+	_update_ui()
+	_update_combat_display()
+
+	return true
+
+
+func _end_player_activation() -> bool:
+	var result: Dictionary = (
+		player_statuses.end_activation()
+	)
+
+	var bleeding_damage: int = int(
+		result.get(
+			"bleeding_damage",
+			0
+		)
+	)
+
+	if bleeding_damage > 0:
+		player_hp -= bleeding_damage
+
+		if player_hp < 0:
+			player_hp = 0
+
+		print(
+			"Sanguinamento giocatore: -",
+			bleeding_damage,
+			" HP"
+		)
+
+	if player_hp <= 0:
+		_player_died()
+		return false
+
+	return true
 
 
 func _start_enemy_turn() -> void:
 	if enemy.is_dead():
 		return
 
-	if not enemy.can_move():
-		enemy_is_moving = true
+	enemy_is_moving = true
 
-		_update_ui()
+	var activation: Dictionary = (
+		enemy.begin_activation()
+	)
 
+	var burn_damage: int = int(
+		activation.get(
+			"burn_damage_applied",
+			0
+		)
+	)
+
+	if burn_damage > 0:
 		print(
-			"Le Gambe del nemico sono distrutte."
+			"Ustione nemico: -",
+			burn_damage,
+			" HP"
 		)
 
+	_update_ui()
+
+	if enemy.is_dead():
+		_enemy_died()
+		return
+
+	var enemy_move_range: int = (
+		enemy.get_move_range(1)
+	)
+
+	if enemy_move_range <= 0:
 		if (
 			_grid_distance(
 				enemy_cell,
@@ -803,10 +1061,6 @@ func _start_enemy_turn() -> void:
 			_finish_enemy_turn()
 
 		return
-
-	enemy_is_moving = true
-
-	_update_ui()
 
 	grid.remove_occupied_cell(
 		enemy_cell
@@ -831,9 +1085,7 @@ func _start_enemy_turn() -> void:
 		_enemy_attack()
 		return
 
-	var next_cell: Vector2i = (
-		path[1]
-	)
+	var next_cell: Vector2i = path[1]
 
 	grid.remove_occupied_cell(
 		enemy_cell
@@ -872,6 +1124,11 @@ func _enemy_attack() -> void:
 		enemy.get_attack_damage()
 	)
 
+	if player_statuses.consume_marked():
+		damage = roundi(
+			damage * 1.25
+		)
+
 	player_hp -= damage
 
 	if player_hp < 0:
@@ -883,13 +1140,6 @@ func _enemy_attack() -> void:
 		" danni."
 	)
 
-	if enemy.is_part_destroyed(
-		"Braccia"
-	):
-		print(
-			"Le Braccia distrutte riducono la forza dell'attacco."
-		)
-
 	_update_ui()
 
 	if player_hp <= 0:
@@ -897,6 +1147,52 @@ func _enemy_attack() -> void:
 		return
 
 	_finish_enemy_turn()
+
+
+func _finish_enemy_turn() -> void:
+	var result: Dictionary = (
+		enemy.end_activation()
+	)
+
+	var bleeding_damage: int = int(
+		result.get(
+			"bleeding_damage_applied",
+			0
+		)
+	)
+
+	if bleeding_damage > 0:
+		print(
+			"Sanguinamento nemico: -",
+			bleeding_damage,
+			" HP"
+		)
+
+	if enemy.is_dead():
+		_enemy_died()
+		return
+
+	enemy_is_moving = false
+
+	if player_is_dead:
+		return
+
+	_begin_player_activation()
+
+
+func _enemy_died() -> void:
+	enemy_is_moving = false
+
+	grid.remove_occupied_cell(
+		enemy_cell
+	)
+
+	enemy.visible = false
+	combat_mode = false
+
+	grid.clear_reachable_cells()
+
+	_update_ui()
 
 
 func _player_died() -> void:
@@ -907,20 +1203,6 @@ func _player_died() -> void:
 	grid.clear_reachable_cells()
 
 	_update_ui()
-
-
-func _finish_enemy_turn() -> void:
-	enemy_is_moving = false
-
-	if player_is_dead:
-		return
-
-	player_actions_remaining = (
-		PLAYER_MAX_ACTIONS
-	)
-
-	_update_ui()
-	_update_combat_display()
 
 
 func _toggle_combat_mode() -> void:
@@ -936,20 +1218,22 @@ func _toggle_combat_mode() -> void:
 	combat_mode = not combat_mode
 
 	if combat_mode:
-		player_actions_remaining = (
-			PLAYER_MAX_ACTIONS
-		)
-
-	_update_ui()
-	_update_combat_display()
+		_begin_player_activation()
+	else:
+		grid.clear_reachable_cells()
+		_update_ui()
 
 
 func _update_combat_display() -> void:
 	if combat_mode:
+		var move_range: int = (
+			_get_player_move_range()
+		)
+
 		var reachable: Array[Vector2i] = (
 			grid.calculate_reachable_cells(
 				player_cell,
-				COMBAT_MOVE_RANGE
+				move_range
 			)
 		)
 
