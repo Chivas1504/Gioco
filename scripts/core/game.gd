@@ -44,6 +44,7 @@ var enemy_is_dead: bool = false
 var mannaia_del_carnefice: CardData
 var chiodo_del_giudizio: CardData
 var maglio_della_pena: CardData
+var bende_del_viandante: CardData
 
 
 func _ready() -> void:
@@ -69,6 +70,7 @@ func _create_test_cards() -> void:
 		"Mannaia del Carnefice",
 		1,
 		7,
+		0,
 		1,
 		mannaia_tags
 	)
@@ -83,6 +85,7 @@ func _create_test_cards() -> void:
 		"Chiodo del Giudizio",
 		1,
 		6,
+		0,
 		5,
 		chiodo_tags
 	)
@@ -97,8 +100,23 @@ func _create_test_cards() -> void:
 		"Maglio della Pena",
 		2,
 		10,
+		0,
 		1,
 		maglio_tags
+	)
+
+	var bende_tags: Array[String] = [
+		"Cura",
+		"Supporto"
+	]
+
+	bende_del_viandante = CardData.new(
+		"Bende del Viandante",
+		1,
+		0,
+		6,
+		0,
+		bende_tags
 	)
 
 
@@ -122,6 +140,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 			if event.keycode == KEY_3:
 				_try_use_card(maglio_della_pena)
+				return
+
+			if event.keycode == KEY_4:
+				_try_use_card(bende_del_viandante)
 				return
 
 	if is_moving or enemy_is_moving:
@@ -219,6 +241,16 @@ func _try_use_card(card: CardData) -> void:
 		)
 		return
 
+	if card.healing > 0:
+		_try_use_healing_card(card)
+		return
+
+	if card.damage > 0:
+		_try_use_attack_card(card)
+		return
+
+
+func _try_use_attack_card(card: CardData) -> void:
 	var distance: int = _grid_distance(
 		player_cell,
 		enemy_cell
@@ -232,6 +264,17 @@ func _try_use_card(card: CardData) -> void:
 		return
 
 	_use_attack_card(card)
+
+
+func _try_use_healing_card(card: CardData) -> void:
+	if player_hp >= PLAYER_MAX_HP:
+		print(
+			card.card_name,
+			": HP già al massimo."
+		)
+		return
+
+	_use_healing_card(card)
 
 
 func _use_attack_card(card: CardData) -> void:
@@ -260,6 +303,36 @@ func _use_attack_card(card: CardData) -> void:
 	if enemy_hp <= 0:
 		_enemy_died()
 		return
+
+	_finish_player_action(card.action_cost)
+
+
+func _use_healing_card(card: CardData) -> void:
+	var old_hp: int = player_hp
+
+	player_hp += card.healing
+
+	if player_hp > PLAYER_MAX_HP:
+		player_hp = PLAYER_MAX_HP
+
+	var healed_amount: int = player_hp - old_hp
+
+	print(
+		"Usata carta: ",
+		card.card_name
+	)
+
+	print(
+		"HP recuperati: ",
+		healed_amount
+	)
+
+	print(
+		"Costo Azioni: ",
+		card.action_cost
+	)
+
+	_update_ui()
 
 	_finish_player_action(card.action_cost)
 
