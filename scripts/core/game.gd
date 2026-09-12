@@ -43,25 +43,16 @@ var enemy_is_dead: bool = false
 
 var mannaia_del_carnefice: CardData
 var chiodo_del_giudizio: CardData
+var maglio_della_pena: CardData
 
 
 func _ready() -> void:
 	_create_test_cards()
 
-	player.position = (
-		grid.position
-		+ grid.cell_to_local(player_cell)
-	)
+	player.position = grid.position + grid.cell_to_local(player_cell)
+	enemy.position = grid.position + grid.cell_to_local(enemy_cell)
 
-	enemy.position = (
-		grid.position
-		+ grid.cell_to_local(enemy_cell)
-	)
-
-	var occupied: Array[Vector2i] = [
-		enemy_cell
-	]
-
+	var occupied: Array[Vector2i] = [enemy_cell]
 	grid.set_occupied_cells(occupied)
 
 	_update_ui()
@@ -96,6 +87,20 @@ func _create_test_cards() -> void:
 		chiodo_tags
 	)
 
+	var maglio_tags: Array[String] = [
+		"Impatto",
+		"Mischia",
+		"Pesante"
+	]
+
+	maglio_della_pena = CardData.new(
+		"Maglio della Pena",
+		2,
+		10,
+		1,
+		maglio_tags
+	)
+
 
 func _unhandled_input(event: InputEvent) -> void:
 	if player_is_dead:
@@ -103,7 +108,6 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event is InputEventKey:
 		if event.pressed and not event.echo:
-
 			if event.keycode == KEY_C:
 				_toggle_combat_mode()
 				return
@@ -116,6 +120,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_try_use_card(chiodo_del_giudizio)
 				return
 
+			if event.keycode == KEY_3:
+				_try_use_card(maglio_della_pena)
+				return
+
 	if is_moving or enemy_is_moving:
 		return
 
@@ -123,26 +131,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 
 	if event is InputEventMouseButton:
-		if (
-			event.button_index == MOUSE_BUTTON_LEFT
-			and event.pressed
-		):
+		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			_handle_grid_click(event.position)
 
 
-func _handle_grid_click(
-	mouse_position: Vector2
-) -> void:
+func _handle_grid_click(mouse_position: Vector2) -> void:
 	if enemy_is_moving:
 		return
 
-	var mouse_local: Vector2 = grid.to_local(
-		mouse_position
-	)
-
-	var clicked_cell: Vector2i = (
-		grid.local_to_cell(mouse_local)
-	)
+	var mouse_local: Vector2 = grid.to_local(mouse_position)
+	var clicked_cell: Vector2i = grid.local_to_cell(mouse_local)
 
 	if not grid.is_cell_walkable(clicked_cell):
 		return
@@ -181,13 +179,11 @@ func _move_player_along_path() -> void:
 	is_moving = true
 
 	var next_cell: Vector2i = current_path.pop_front()
-
 	var target_position: Vector2 = (
-		grid.position
-		+ grid.cell_to_local(next_cell)
+		grid.position + grid.cell_to_local(next_cell)
 	)
 
-	var tween := create_tween()
+	var tween: Tween = create_tween()
 
 	tween.tween_property(
 		player,
@@ -217,6 +213,10 @@ func _try_use_card(card: CardData) -> void:
 		return
 
 	if player_actions_remaining < card.action_cost:
+		print(
+			card.card_name,
+			": Azioni insufficienti."
+		)
 		return
 
 	var distance: int = _grid_distance(
@@ -250,6 +250,11 @@ func _use_attack_card(card: CardData) -> void:
 		card.damage
 	)
 
+	print(
+		"Costo Azioni: ",
+		card.action_cost
+	)
+
 	_update_ui()
 
 	if enemy_hp <= 0:
@@ -265,7 +270,6 @@ func _enemy_died() -> void:
 	grid.remove_occupied_cell(enemy_cell)
 
 	enemy.visible = false
-
 	combat_mode = false
 
 	grid.clear_reachable_cells()
@@ -286,7 +290,6 @@ func _finish_player_action(action_cost: int) -> void:
 
 	if player_actions_remaining <= 0:
 		grid.clear_reachable_cells()
-
 		_start_enemy_turn()
 	else:
 		_update_combat_display()
@@ -326,11 +329,10 @@ func _start_enemy_turn() -> void:
 	grid.add_occupied_cell(enemy_cell)
 
 	var target_position: Vector2 = (
-		grid.position
-		+ grid.cell_to_local(enemy_cell)
+		grid.position + grid.cell_to_local(enemy_cell)
 	)
 
-	var tween := create_tween()
+	var tween: Tween = create_tween()
 
 	tween.tween_property(
 		enemy,
@@ -419,14 +421,12 @@ func _grid_distance(
 	first_cell: Vector2i,
 	second_cell: Vector2i
 ) -> int:
-	var difference: Vector2i = (
-		first_cell - second_cell
-	)
+	var difference: Vector2i = first_cell - second_cell
 
-	return (
-		abs(difference.x)
-		+ abs(difference.y)
-	)
+	var distance_x: int = absi(difference.x)
+	var distance_y: int = absi(difference.y)
+
+	return distance_x + distance_y
 
 
 func _update_ui() -> void:
@@ -457,15 +457,11 @@ func _update_ui() -> void:
 
 	if player_is_dead:
 		state_label.text = "MORTO"
-
 	elif enemy_is_dead:
 		state_label.text = "COMBATTIMENTO TERMINATO"
-
 	elif enemy_is_moving:
 		state_label.text = "TURNO NEMICO"
-
 	elif combat_mode:
 		state_label.text = "TURNO GIOCATORE"
-
 	else:
 		state_label.text = "ESPLORAZIONE"
