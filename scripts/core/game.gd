@@ -8,6 +8,7 @@ extends Node2D
 @onready var state_label: Label = $UI/HUD/CombatPanel/StateLabel
 @onready var enemy_hp_label: Label = $UI/HUD/CombatPanel/EnemyHPLabel
 @onready var target_part_label: Label = $UI/HUD/CombatPanel/TargetPartLabel
+@onready var intent_label: Label = $UI/HUD/CombatPanel/IntentLabel
 
 @onready var player_status_label: Label = (
 	$UI/HUD/CombatPanel/PlayerStatusLabel
@@ -15,6 +16,10 @@ extends Node2D
 
 @onready var enemy_status_label: Label = (
 	$UI/HUD/CombatPanel/EnemyStatusLabel
+)
+
+@onready var combat_log_label: Label = (
+	$UI/HUD/CombatPanel/CombatLogLabel
 )
 
 @onready var card_bar = $UI/HUD/CardBar
@@ -35,6 +40,7 @@ const SELECTION_RADIUS := 42.0
 const PLAYER_COMBAT_POSITION := Vector2(250.0, 330.0)
 const ENEMY_COMBAT_CENTER := Vector2(760.0, 300.0)
 const ENEMY_COMBAT_SPACING := 90.0
+const MAX_COMBAT_LOG_LINES := 5
 
 
 var current_mode: String = GameMode.EXPLORATION
@@ -62,6 +68,7 @@ var enemy_turn_index: int = 0
 var enemy_is_acting: bool = false
 var player_is_dead: bool = false
 var player_actions_remaining: int = PLAYER_MAX_ACTIONS
+var combat_log: Array[String] = []
 
 var mannaia_del_carnefice: CardData
 var chiodo_del_giudizio: CardData
@@ -258,6 +265,7 @@ func _enter_exploration_mode() -> void:
 
 	enemy_is_acting = false
 	player.velocity = Vector2.ZERO
+	combat_log.clear()
 
 	card_bar.visible = false
 
@@ -285,6 +293,7 @@ func _enter_combat_mode() -> void:
 
 	current_mode = GameMode.COMBAT
 	player.velocity = Vector2.ZERO
+	combat_log.clear()
 
 	_save_exploration_positions()
 	_arrange_combat_stage()
@@ -301,6 +310,13 @@ func _enter_combat_mode() -> void:
 
 	_update_enemy_visibility()
 	_update_enemy_selection_visuals()
+	_add_combat_log(
+		"Combattimento: "
+		+ str(
+			_count_alive_combat_enemies()
+		)
+		+ " nemici."
+	)
 	_begin_player_activation()
 
 
@@ -861,6 +877,12 @@ func _try_use_card(
 	if not _is_card_available(
 		card
 	):
+		if card != null:
+			_add_combat_log(
+				card.card_name
+				+ " non e disponibile."
+			)
+
 		return
 
 	if card.is_reaction():
@@ -900,16 +922,53 @@ func _use_attack_card(
 			_get_selected_body_part()
 		)
 
-		target_enemy.take_part_damage(
+		var damage_result: Dictionary = target_enemy.take_part_damage(
 			target_part,
 			modified_damage
 		)
+
+		_add_combat_log(
+			card.card_name
+			+ " colpisce "
+			+ target_enemy.get_enemy_name()
+			+ " / "
+			+ target_part
+			+ ": "
+			+ str(
+				damage_result.get(
+					"part_damage",
+					0
+				)
+			)
+			+ " parte, "
+			+ str(
+				damage_result.get(
+					"vitality_damage",
+					0
+				)
+			)
+			+ " Vitalita."
+		)
 	else:
-		target_enemy.take_vitality_damage(
+		var vitality_damage: int = target_enemy.take_vitality_damage(
 			modified_damage
 		)
 
+		_add_combat_log(
+			card.card_name
+			+ " colpisce "
+			+ target_enemy.get_enemy_name()
+			+ ": "
+			+ str(vitality_damage)
+			+ " Vitalita."
+		)
+
 	if target_enemy.is_dead():
+		_add_combat_log(
+			target_enemy.get_enemy_name()
+			+ " muore."
+		)
+
 		_handle_enemy_death(
 			target_enemy
 		)
@@ -929,6 +988,15 @@ func _use_attack_card(
 	_apply_card_effort(
 		card
 	)
+
+	if card.effort_generated != 0:
+		_add_combat_log(
+			"Sforzo "
+			+ _format_signed_int(
+				card.effort_generated
+			)
+			+ "."
+		)
 
 	_update_ui()
 	_finish_player_action(
@@ -961,6 +1029,28 @@ func _apply_card_effects(
 				card.status_stacks
 			)
 
+			_add_combat_log(
+				card.status_to_apply
+				+ " applicato ("
+				+ str(
+					roundi(
+						status_chance * 100.0
+					)
+				)
+				+ "%)."
+			)
+		else:
+			_add_combat_log(
+				card.status_to_apply
+				+ " mancato ("
+				+ str(
+					roundi(
+						status_chance * 100.0
+					)
+				)
+				+ "%)."
+			)
+
 	if card.fracture_selected_part:
 		var target_part: String = (
 			_get_selected_body_part()
@@ -985,6 +1075,30 @@ func _apply_card_effects(
 		):
 			target_enemy.apply_fracture(
 				target_part
+			)
+
+			_add_combat_log(
+				"Frattura a "
+				+ target_part
+				+ " riuscita ("
+				+ str(
+					roundi(
+						fracture_chance * 100.0
+					)
+				)
+				+ "%)."
+			)
+		else:
+			_add_combat_log(
+				"Frattura a "
+				+ target_part
+				+ " mancata ("
+				+ str(
+					roundi(
+						fracture_chance * 100.0
+					)
+				)
+				+ "%)."
 			)
 
 
@@ -1053,6 +1167,8 @@ func _get_fracture_chance(
 func _use_healing_card(
 	card: CardData
 ) -> void:
+	var old_hp: int = player_hp
+
 	player_hp = mini(
 		player_hp + card.healing,
 		PLAYER_MAX_HP
@@ -1060,6 +1176,17 @@ func _use_healing_card(
 
 	_apply_card_effort(
 		card
+	)
+
+	_add_combat_log(
+		card.card_name
+		+ ": +"
+		+ str(player_hp - old_hp)
+		+ " HP, Sforzo "
+		+ _format_signed_int(
+			card.effort_generated
+		)
+		+ "."
 	)
 
 	_update_ui()
@@ -1086,6 +1213,13 @@ func _use_reaction_card(
 		card
 	)
 
+	_add_combat_log(
+		card.card_name
+		+ ": reazione pronta, -"
+		+ str(player_reaction_block)
+		+ " danno al prossimo colpo."
+	)
+
 	_update_ui()
 	_finish_player_action(
 		card.action_cost
@@ -1100,6 +1234,15 @@ func _apply_card_effort(
 		0,
 		PLAYER_MAX_EFFORT
 	)
+
+
+func _format_signed_int(
+	value: int
+) -> String:
+	if value > 0:
+		return "+" + str(value)
+
+	return str(value)
 
 
 func _finish_player_action(
@@ -1138,9 +1281,18 @@ func _begin_player_activation() -> bool:
 		0
 	)
 
+	if burn_damage > 0:
+		_add_combat_log(
+			"Ustione: "
+			+ str(burn_damage)
+			+ " danni."
+		)
+
 	if player_hp <= 0:
 		_player_died()
 		return false
+
+	var effort_before_recovery: int = player_effort
 
 	player_effort = maxi(
 		player_effort - PLAYER_EFFORT_RECOVERY,
@@ -1179,6 +1331,21 @@ func _begin_player_activation() -> bool:
 
 	enemy_is_acting = false
 
+	var turn_message: String = (
+		"Tuo turno: "
+		+ str(player_actions_remaining)
+		+ " PA."
+	)
+
+	if effort_before_recovery != player_effort:
+		turn_message += (
+			" Recuperi 1 Sforzo."
+		)
+
+	_add_combat_log(
+		turn_message
+	)
+
 	_update_ui()
 	return true
 
@@ -1199,6 +1366,13 @@ func _end_player_activation() -> bool:
 		player_hp - bleeding_damage,
 		0
 	)
+
+	if bleeding_damage > 0:
+		_add_combat_log(
+			"Sanguinamento: "
+			+ str(bleeding_damage)
+			+ " danni."
+		)
 
 	if player_hp <= 0:
 		_player_died()
@@ -1255,6 +1429,11 @@ func _run_enemy_turn(
 	)
 
 	if enemy_unit.is_dead():
+		_add_combat_log(
+			enemy_unit.get_enemy_name()
+			+ " muore."
+		)
+
 		_handle_enemy_death(
 			enemy_unit
 		)
@@ -1270,6 +1449,11 @@ func _run_enemy_turn(
 	)
 
 	if enemy_is_stunned:
+		_add_combat_log(
+			enemy_unit.get_enemy_name()
+			+ " e stordito."
+		)
+
 		_finish_single_enemy_turn(
 			enemy_unit
 		)
@@ -1363,13 +1547,21 @@ func _execute_chain_pull_action(
 			1
 		)
 
+		_add_combat_log(
+			enemy_unit.get_enemy_name()
+			+ ": "
+			+ status_name
+			+ " applicato."
+		)
+
 	_apply_enemy_damage(
 		int(
 			action.get(
 				"damage",
 				0
 			)
-		)
+		),
+		enemy_unit.get_enemy_name()
 	)
 
 	_play_enemy_action_motion(
@@ -1394,7 +1586,8 @@ func _execute_ranged_action(
 				"damage",
 				0
 			)
-		)
+		),
+		enemy_unit.get_enemy_name()
 	)
 
 	_play_enemy_action_motion(
@@ -1413,7 +1606,8 @@ func _enemy_attack(
 	enemy_unit: EnemyUnit
 ) -> void:
 	_apply_enemy_damage(
-		enemy_unit.get_attack_damage()
+		enemy_unit.get_attack_damage(),
+		enemy_unit.get_enemy_name()
 	)
 
 	_play_enemy_action_motion(
@@ -1429,14 +1623,24 @@ func _enemy_attack(
 
 
 func _apply_enemy_damage(
-	damage: int
+	damage: int,
+	source_name: String
 ) -> void:
 	if player_statuses.consume_marked():
 		damage = roundi(
 			damage * 1.25
 		)
 
+		_add_combat_log(
+			"Marcato consumato: danno nemico aumentato."
+		)
+
 	if player_reaction_block > 0:
+		var blocked_damage: int = mini(
+			damage,
+			player_reaction_block
+		)
+
 		damage = maxi(
 			damage - player_reaction_block,
 			0
@@ -1444,9 +1648,24 @@ func _apply_enemy_damage(
 
 		player_reaction_block = 0
 
+		_add_combat_log(
+			"Reazione: "
+			+ str(blocked_damage)
+			+ " danni bloccati."
+		)
+
+	var old_hp: int = player_hp
+
 	player_hp = maxi(
 		player_hp - damage,
 		0
+	)
+
+	_add_combat_log(
+		source_name
+		+ " infligge "
+		+ str(old_hp - player_hp)
+		+ " danni."
 	)
 
 	_update_ui()
@@ -1459,7 +1678,24 @@ func _finish_single_enemy_turn(
 	enemy_unit: EnemyUnit
 ) -> void:
 	if not enemy_unit.is_dead():
-		enemy_unit.end_activation()
+		var result: Dictionary = (
+			enemy_unit.end_activation()
+		)
+
+		var bleeding_damage: int = int(
+			result.get(
+				"bleeding_damage_applied",
+				0
+			)
+		)
+
+		if bleeding_damage > 0:
+			_add_combat_log(
+				enemy_unit.get_enemy_name()
+				+ " perde "
+				+ str(bleeding_damage)
+				+ " per Sanguinamento."
+			)
 
 	if enemy_unit.is_dead():
 		_handle_enemy_death(
@@ -1550,8 +1786,100 @@ func _player_died() -> void:
 
 	player.velocity = Vector2.ZERO
 	card_bar.visible = false
+	_add_combat_log(
+		"Il giocatore cade."
+	)
 
 	_update_ui()
+
+
+func _add_combat_log(
+	message: String
+) -> void:
+	if message.is_empty():
+		return
+
+	combat_log.append(
+		message
+	)
+
+	while combat_log.size() > MAX_COMBAT_LOG_LINES:
+		combat_log.remove_at(0)
+
+	_update_combat_log_label()
+
+
+func _update_combat_log_label() -> void:
+	if combat_log_label == null:
+		return
+
+	if combat_log.is_empty():
+		combat_log_label.text = "Log: -"
+		return
+
+	combat_log_label.text = (
+		"Log:\n"
+		+ "\n".join(
+			combat_log
+		)
+	)
+
+
+func _update_intent_label() -> void:
+	if intent_label == null:
+		return
+
+	intent_label.text = (
+		"Intento: "
+		+ _get_selected_enemy_intent_text()
+	)
+
+
+func _get_selected_enemy_intent_text() -> String:
+	if not _is_combat_mode():
+		return "-"
+
+	if selected_enemy == null:
+		return "-"
+
+	if selected_enemy.is_dead():
+		return "-"
+
+	if selected_enemy.status_manager.has_status(
+		StatusManager.STUN
+	):
+		return "salta il turno"
+
+	if selected_enemy.can_use_special_ability():
+		match selected_enemy.get_special_ability():
+			EnemyAbilitySystem.ACTION_CHAIN_PULL:
+				return (
+					"catena, "
+					+ str(
+						maxi(
+							selected_enemy.get_attack_damage() - 1,
+							0
+						)
+					)
+					+ " danni + Immobilizzato"
+				)
+
+			EnemyAbilitySystem.ACTION_RANGED_ATTACK:
+				return (
+					"attacco a distanza, "
+					+ str(
+						selected_enemy.get_attack_damage()
+					)
+					+ " danni"
+				)
+
+	return (
+		"attacco, "
+		+ str(
+			selected_enemy.get_attack_damage()
+		)
+		+ " danni"
+	)
 
 
 func _status_summary_to_text(
@@ -1681,6 +2009,8 @@ func _update_ui() -> void:
 		)
 
 	_update_status_labels()
+	_update_intent_label()
+	_update_combat_log_label()
 	_refresh_card_bar()
 	_update_enemy_selection_visuals()
 
