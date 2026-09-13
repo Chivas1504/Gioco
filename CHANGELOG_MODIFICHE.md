@@ -9,5 +9,4 @@
 - Il targeting anatomico si applica solo alle carte appropriate, come Chiodo del Giudizio e Maglio della Pena.
 - Gli status anatomici e generali non sono piu garantiti: usano probabilita e bonus condizionali, per esempio bersaglio Marcato o gia Sanguinante.
 - Aggiornata la UI per mostrare PA, Sforzo, Reazione pronta, Vitalita bersaglio, mira anatomica e status.
-- Aggiunti log di combattimento e intento del nemico selezionato per rendere chiari danni, cure, reazioni e status riusciti o mancati.
 - Mantenuti esplorazione, stanze, rilevamento nemici, gruppi di combattimento, anatomia, status e dati degli incontri.
