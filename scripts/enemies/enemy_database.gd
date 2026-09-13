@@ -3,6 +3,7 @@ extends RefCounted
 
 
 const TEST_ENEMY := "test_enemy"
+
 const SENZA_VOLTO := "senza_volto"
 const TRASCINATO := "trascinato"
 const VEGLIANTE := "vegliante"
@@ -37,16 +38,6 @@ static func get_enemy(
 			return null
 
 
-static func get_all_enemy_ids() -> Array[String]:
-	return [
-		TEST_ENEMY,
-		SENZA_VOLTO,
-		TRASCINATO,
-		VEGLIANTE,
-		SORDO
-	]
-
-
 static func _create_test_enemy() -> EnemyData:
 	return EnemyData.new(
 		"Nemico Test",
@@ -58,7 +49,13 @@ static func _create_test_enemy() -> EnemyData:
 			"Torso": 18,
 			"Braccia": 12,
 			"Gambe": 14
-		}
+		},
+		"",
+		0,
+		0,
+		"",
+		EnemyData.PERCEPTION_SIGHT,
+		150.0
 	)
 
 
@@ -72,7 +69,13 @@ static func _create_senza_volto() -> EnemyData:
 			"Testa": 10,
 			"Torso": 18,
 			"Gambe": 14
-		}
+		},
+		"",
+		0,
+		0,
+		"",
+		EnemyData.PERCEPTION_SIGHT,
+		150.0
 	)
 
 
@@ -87,10 +90,12 @@ static func _create_trascinato() -> EnemyData:
 			"Braccia": 14,
 			"Gambe": 12
 		},
-		"chain_pull",
+		EnemyAbilitySystem.ACTION_CHAIN_PULL,
 		3,
 		1,
-		"Braccia"
+		"Braccia",
+		EnemyData.PERCEPTION_SIGHT,
+		130.0
 	)
 
 
@@ -105,10 +110,12 @@ static func _create_vegliante() -> EnemyData:
 			"Torso": 14,
 			"Braccia": 10
 		},
-		"ranged_attack",
+		EnemyAbilitySystem.ACTION_RANGED_ATTACK,
 		5,
 		0,
-		"Occhio"
+		"Occhio",
+		EnemyData.PERCEPTION_SIGHT,
+		230.0
 	)
 
 
@@ -123,5 +130,11 @@ static func _create_sordo() -> EnemyData:
 			"Torso": 18,
 			"Braccia": 14,
 			"Gambe": 16
-		}
+		},
+		"",
+		0,
+		0,
+		"",
+		EnemyData.PERCEPTION_NOISE,
+		190.0
 	)
