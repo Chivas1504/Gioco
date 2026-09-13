@@ -24,11 +24,17 @@ extends Node2D
 const MOVE_TIME := 0.12
 const ENEMY_MOVE_TIME := 0.18
 
+const EXPLORATION_MOVE_SPEED := 220.0
+const EXPLORATION_DETECTION_RANGE := 150.0
+
 const COMBAT_MOVE_RANGE := 2
 const PLAYER_MAX_ACTIONS := 2
 
 const PLAYER_MAX_HP := 30
 const COLLISION_DAMAGE := 2
+
+
+var current_mode: String = GameMode.EXPLORATION
 
 
 var player_cell: Vector2i = Vector2i(0, 0)
@@ -52,7 +58,6 @@ var current_path: Array[Vector2i] = []
 var is_moving: bool = false
 var enemy_is_moving: bool = false
 
-var combat_mode: bool = false
 var player_is_dead: bool = false
 
 var player_actions_remaining: int = PLAYER_MAX_ACTIONS
@@ -83,8 +88,207 @@ func _ready() -> void:
 	_update_grid_occupancy()
 	_update_enemy_selection_visuals()
 
+	_enter_exploration_mode()
+
 	_update_ui()
-	_update_combat_display()
+
+
+func _process(delta: float) -> void:
+	if player_is_dead:
+		return
+
+	if not _is_exploration_mode():
+		return
+
+	_process_exploration_movement(
+		delta
+	)
+
+	_check_enemy_detection()
+
+
+func _process_exploration_movement(
+	delta: float
+) -> void:
+	var input_direction: Vector2 = Input.get_vector(
+		"move_left",
+		"move_right",
+		"move_up",
+		"move_down"
+	)
+
+	if input_direction == Vector2.ZERO:
+		return
+
+	input_direction = input_direction.normalized()
+
+	var movement: Vector2 = (
+		input_direction
+		* EXPLORATION_MOVE_SPEED
+		* delta
+	)
+
+	player.position += movement
+
+
+func _check_enemy_detection() -> void:
+	if not _is_exploration_mode():
+		return
+
+	var detecting_enemy: EnemyUnit = (
+		EnemyDetectionSystem.find_detecting_enemy(
+			player.position,
+			enemy_units,
+			EXPLORATION_DETECTION_RANGE
+		)
+	)
+
+	if detecting_enemy == null:
+		return
+
+	selected_enemy = detecting_enemy
+
+	print(
+		detecting_enemy.get_enemy_name(),
+		" ha rilevato il giocatore."
+	)
+
+	_enter_combat_mode()
+
+
+func _is_combat_mode() -> bool:
+	return current_mode == GameMode.COMBAT
+
+
+func _is_exploration_mode() -> bool:
+	return current_mode == GameMode.EXPLORATION
+
+
+func _enter_exploration_mode() -> void:
+	current_mode = GameMode.EXPLORATION
+
+	is_moving = false
+	enemy_is_moving = false
+
+	current_path.clear()
+
+	grid.clear_reachable_cells()
+	grid.visible = false
+
+	card_bar.visible = false
+
+	_update_ui()
+
+
+func _enter_combat_mode() -> void:
+	if player_is_dead:
+		return
+
+	if _all_enemies_dead():
+		return
+
+	_snap_player_to_combat_grid()
+
+	current_mode = GameMode.COMBAT
+
+	grid.visible = true
+
+	if selected_enemy == null:
+		selected_enemy = (
+			_get_first_alive_enemy()
+		)
+
+	_update_grid_occupancy()
+
+	_begin_player_activation()
+
+
+func _snap_player_to_combat_grid() -> void:
+	var player_position_relative_to_grid: Vector2 = (
+		player.position - grid.position
+	)
+
+	var desired_cell: Vector2i = (
+		grid.local_to_cell(
+			player_position_relative_to_grid
+		)
+	)
+
+	var valid_cell: Vector2i = (
+		_find_nearest_valid_combat_cell(
+			desired_cell
+		)
+	)
+
+	player_cell = valid_cell
+
+	player.position = (
+		grid.position
+		+ grid.cell_to_local(
+			player_cell
+		)
+	)
+
+	print(
+		"Entrata in combattimento. Player agganciato alla cella ",
+		player_cell
+	)
+
+
+func _find_nearest_valid_combat_cell(
+	start_cell: Vector2i
+) -> Vector2i:
+	if (
+		grid.is_cell_inside(
+			start_cell
+		)
+		and not grid.is_cell_blocked(
+			start_cell
+		)
+		and not grid.is_cell_occupied(
+			start_cell
+		)
+	):
+		return start_cell
+
+	var best_cell: Vector2i = player_cell
+	var best_distance: int = 999999
+
+	for x in range(
+		grid.GRID_SIZE
+	):
+		for y in range(
+			grid.GRID_SIZE
+		):
+			var candidate := Vector2i(
+				x,
+				y
+			)
+
+			if grid.is_cell_blocked(
+				candidate
+			):
+				continue
+
+			if grid.is_cell_occupied(
+				candidate
+			):
+				continue
+
+			var distance: int = (
+				absi(
+					candidate.x - start_cell.x
+				)
+				+ absi(
+					candidate.y - start_cell.y
+				)
+			)
+
+			if distance < best_distance:
+				best_distance = distance
+				best_cell = candidate
+
+	return best_cell
 
 
 func _load_test_cards() -> void:
@@ -240,10 +444,6 @@ func _unhandled_input(
 
 	if event is InputEventKey:
 		if event.pressed and not event.echo:
-			if event.keycode == KEY_C:
-				_toggle_combat_mode()
-				return
-
 			if event.keycode == KEY_Q:
 				_select_previous_body_part()
 				return
@@ -252,13 +452,13 @@ func _unhandled_input(
 				_select_next_body_part()
 				return
 
+	if not _is_combat_mode():
+		return
+
 	if is_moving or enemy_is_moving:
 		return
 
-	if (
-		combat_mode
-		and player_actions_remaining <= 0
-	):
+	if player_actions_remaining <= 0:
 		return
 
 	if event is InputEventMouseButton:
@@ -274,6 +474,9 @@ func _unhandled_input(
 func _handle_grid_click(
 	mouse_position: Vector2
 ) -> void:
+	if not _is_combat_mode():
+		return
+
 	if enemy_is_moving:
 		return
 
@@ -316,17 +519,16 @@ func _handle_grid_click(
 	if path.size() <= 1:
 		return
 
-	if combat_mode:
-		var distance: int = (
-			path.size() - 1
-		)
+	var distance: int = (
+		path.size() - 1
+	)
 
-		var move_range: int = (
-			_get_player_move_range()
-		)
+	var move_range: int = (
+		_get_player_move_range()
+	)
 
-		if distance > move_range:
-			return
+	if distance > move_range:
+		return
 
 	current_path = path
 	current_path.remove_at(0)
@@ -355,7 +557,10 @@ func _update_enemy_selection_visuals() -> void:
 		if enemy_unit.is_dead():
 			continue
 
-		if enemy_unit == selected_enemy:
+		if (
+			_is_combat_mode()
+			and enemy_unit == selected_enemy
+		):
 			enemy_unit.scale = Vector2(
 				1.20,
 				1.20
@@ -425,7 +630,7 @@ func _update_grid_occupancy() -> void:
 
 
 func _select_previous_body_part() -> void:
-	if not combat_mode:
+	if not _is_combat_mode():
 		return
 
 	if selected_enemy == null:
@@ -455,7 +660,7 @@ func _select_previous_body_part() -> void:
 
 
 func _select_next_body_part() -> void:
-	if not combat_mode:
+	if not _is_combat_mode():
 		return
 
 	if selected_enemy == null:
@@ -520,12 +725,9 @@ func _move_player_along_path() -> void:
 	if current_path.is_empty():
 		is_moving = false
 
-		if combat_mode:
-			_finish_player_action(
-				1
-			)
-		else:
-			_update_combat_display()
+		_finish_player_action(
+			1
+		)
 
 		return
 
@@ -574,7 +776,7 @@ func _is_card_available(
 	if card == null:
 		return false
 
-	if not combat_mode:
+	if not _is_combat_mode():
 		return false
 
 	if player_is_dead:
@@ -649,7 +851,7 @@ func _get_effective_card_range(
 
 func _refresh_card_bar() -> void:
 	card_bar.visible = (
-		combat_mode
+		_is_combat_mode()
 		and not player_is_dead
 		and not _all_enemies_dead()
 	)
@@ -1182,6 +1384,9 @@ func _end_player_activation() -> bool:
 
 
 func _start_enemy_phase() -> void:
+	if not _is_combat_mode():
+		return
+
 	enemy_is_moving = true
 	enemy_turn_index = 0
 
@@ -1192,6 +1397,9 @@ func _start_enemy_phase() -> void:
 
 func _run_next_enemy_turn() -> void:
 	if player_is_dead:
+		return
+
+	if not _is_combat_mode():
 		return
 
 	while enemy_turn_index < enemy_units.size():
@@ -1532,6 +1740,7 @@ func _execute_enemy_move(
 			)
 	)
 
+
 func _execute_chain_pull_action(
 	enemy_unit: EnemyUnit,
 	action: Dictionary
@@ -1750,48 +1959,22 @@ func _all_enemies_dead() -> bool:
 
 
 func _end_combat() -> void:
-	combat_mode = false
-	enemy_is_moving = false
-
-	grid.clear_reachable_cells()
+	_enter_exploration_mode()
 
 
 func _player_died() -> void:
 	player_is_dead = true
-	combat_mode = false
 	enemy_is_moving = false
 
 	grid.clear_reachable_cells()
+	grid.visible = false
+	card_bar.visible = false
 
 	_update_ui()
 
 
-func _toggle_combat_mode() -> void:
-	if player_is_dead:
-		return
-
-	if _all_enemies_dead():
-		return
-
-	if is_moving or enemy_is_moving:
-		return
-
-	combat_mode = not combat_mode
-
-	if combat_mode:
-		if selected_enemy == null:
-			selected_enemy = (
-				_get_first_alive_enemy()
-			)
-
-		_begin_player_activation()
-	else:
-		grid.clear_reachable_cells()
-		_update_ui()
-
-
 func _update_combat_display() -> void:
-	if combat_mode:
+	if _is_combat_mode():
 		var move_range: int = (
 			_get_player_move_range()
 		)
@@ -1983,7 +2166,7 @@ func _update_ui() -> void:
 			"TURNO NEMICI"
 		)
 
-	elif combat_mode:
+	elif _is_combat_mode():
 		state_label.text = (
 			"TURNO GIOCATORE"
 		)
