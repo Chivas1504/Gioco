@@ -7,7 +7,8 @@ const CHIODO_DEL_GIUDIZIO := "chiodo_del_giudizio"
 const MAGLIO_DELLA_PENA := "maglio_della_pena"
 const BENDE_DEL_VIANDANTE := "bende_del_viandante"
 const CATENA_DEL_CONTRAPPASSO := "catena_del_contrappasso"
-const SPINTA_DEI_CONDANNATI := "spinta_dei_condannati"
+const PARATA_DEI_CONDANNATI := "parata_dei_condannati"
+const ESECUZIONE := "esecuzione"
 
 
 static func get_card(
@@ -29,8 +30,11 @@ static func get_card(
 		CATENA_DEL_CONTRAPPASSO:
 			return _create_catena_del_contrappasso()
 
-		SPINTA_DEI_CONDANNATI:
-			return _create_spinta_dei_condannati()
+		PARATA_DEI_CONDANNATI:
+			return _create_parata_dei_condannati()
+
+		ESECUZIONE:
+			return _create_esecuzione()
 
 		_:
 			push_error(
@@ -48,7 +52,8 @@ static func get_all_card_ids() -> Array[String]:
 		MAGLIO_DELLA_PENA,
 		BENDE_DEL_VIANDANTE,
 		CATENA_DEL_CONTRAPPASSO,
-		SPINTA_DEI_CONDANNATI
+		PARATA_DEI_CONDANNATI,
+		ESECUZIONE
 	]
 
 
@@ -61,10 +66,8 @@ static func _create_mannaia_del_carnefice() -> CardData:
 	var card: CardData = CardData.new(
 		"Mannaia del Carnefice",
 		1,
-		7,
-		0,
 		1,
-		0,
+		7,
 		0,
 		tags
 	)
@@ -75,6 +78,10 @@ static func _create_mannaia_del_carnefice() -> CardData:
 
 	card.status_duration = 3
 	card.status_stacks = 1
+	card.status_chance = 0.15
+	card.marked_status_bonus = 0.10
+	card.conditional_status_name = StatusManager.BLEEDING
+	card.conditional_status_bonus = 0.05
 
 	return card
 
@@ -89,10 +96,8 @@ static func _create_chiodo_del_giudizio() -> CardData:
 	var card: CardData = CardData.new(
 		"Chiodo del Giudizio",
 		1,
-		6,
-		0,
+		1,
 		5,
-		0,
 		0,
 		tags
 	)
@@ -103,6 +108,7 @@ static func _create_chiodo_del_giudizio() -> CardData:
 
 	card.status_duration = -1
 	card.status_stacks = 1
+	card.status_chance = 0.80
 
 	return card
 
@@ -117,10 +123,8 @@ static func _create_maglio_della_pena() -> CardData:
 	var card: CardData = CardData.new(
 		"Maglio della Pena",
 		2,
+		2,
 		10,
-		0,
-		1,
-		0,
 		0,
 		tags
 	)
@@ -138,12 +142,10 @@ static func _create_bende_del_viandante() -> CardData:
 
 	return CardData.new(
 		"Bende del Viandante",
-		1,
+		2,
+		-1,
 		0,
 		6,
-		0,
-		0,
-		0,
 		tags
 	)
 
@@ -158,11 +160,9 @@ static func _create_catena_del_contrappasso() -> CardData:
 
 	var card: CardData = CardData.new(
 		"Catena del Contrappasso",
+		2,
 		1,
-		4,
-		0,
-		3,
-		1,
+		6,
 		0,
 		tags
 	)
@@ -173,34 +173,49 @@ static func _create_catena_del_contrappasso() -> CardData:
 
 	card.status_duration = 2
 	card.status_stacks = 1
+	card.status_chance = 0.35
+	card.marked_status_bonus = 0.10
 
 	return card
 
 
-static func _create_spinta_dei_condannati() -> CardData:
+static func _create_parata_dei_condannati() -> CardData:
 	var tags: Array[String] = [
-		"Impatto",
-		"Mischia",
-		"Controllo",
-		"Spinta"
+		"Difesa",
+		"Reazione",
+		"Supporto"
 	]
 
 	var card: CardData = CardData.new(
-		"Spinta dei Condannati",
-		1,
-		3,
-		0,
+		"Parata dei Condannati",
 		1,
 		0,
-		1,
+		0,
+		0,
 		tags
 	)
 
-	card.collision_status_to_apply = (
-		StatusManager.STUN
+	card.reaction_block = 5
+	card.reaction_effort_relief = 1
+
+	return card
+
+
+static func _create_esecuzione() -> CardData:
+	var tags: Array[String] = [
+		"Finisher",
+		"Pesante"
+	]
+
+	var card: CardData = CardData.new(
+		"Esecuzione",
+		3,
+		3,
+		22,
+		0,
+		tags
 	)
 
-	card.collision_status_duration = 1
-	card.collision_status_stacks = 1
+	card.low_vitality_required_ratio = 0.20
 
 	return card

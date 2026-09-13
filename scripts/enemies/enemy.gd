@@ -38,13 +38,37 @@ func setup(
 
 func _draw() -> void:
 	draw_circle(
-		Vector2.ZERO,
-		20.0,
+		Vector2(0.0, -18.0),
+		16.0,
 		Color(
 			0.75,
 			0.08,
 			0.08
 		)
+	)
+
+	draw_rect(
+		Rect2(-18.0, -2.0, 36.0, 31.0),
+		Color(0.32, 0.06, 0.06)
+	)
+
+	draw_circle(
+		Vector2(-6.0, -20.0),
+		2.0,
+		Color.BLACK
+	)
+
+	draw_circle(
+		Vector2(6.0, -20.0),
+		2.0,
+		Color.BLACK
+	)
+
+	draw_line(
+		Vector2(-20.0, 30.0),
+		Vector2(20.0, 30.0),
+		Color.BLACK,
+		3.0
 	)
 
 
@@ -343,6 +367,11 @@ func get_attack_damage() -> int:
 			3
 		)
 
+	if _is_part_destroyed(
+		"Gambe"
+	):
+		result -= 1
+
 	if status_manager.has_fracture(
 		"Testa"
 	):
@@ -352,6 +381,20 @@ func get_attack_damage() -> int:
 		"Braccia"
 	):
 		result -= 2
+
+	if status_manager.has_fracture(
+		"Gambe"
+	):
+		result -= 1
+
+	if status_manager.is_slowed():
+		result -= 1
+
+	if status_manager.is_immobilized():
+		result = mini(
+			result,
+			2
+		)
 
 	return maxi(
 		result,
@@ -371,13 +414,6 @@ func get_special_range() -> int:
 		return 0
 
 	return enemy_data.special_range
-
-
-func get_special_pull_distance() -> int:
-	if enemy_data == null:
-		return 0
-
-	return enemy_data.special_pull_distance
 
 
 func can_use_special_ability() -> bool:

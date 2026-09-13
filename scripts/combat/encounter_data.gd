@@ -5,15 +5,20 @@ extends Resource
 class EncounterEnemy:
 	var enemy_id: String = ""
 	var spawn_cell: Vector2i = Vector2i.ZERO
+
+	var room_id: String = ""
 	var combat_group_id: String = ""
 
 	func _init(
 		new_enemy_id: String = "",
 		new_spawn_cell: Vector2i = Vector2i.ZERO,
+		new_room_id: String = "",
 		new_combat_group_id: String = ""
 	) -> void:
 		enemy_id = new_enemy_id
 		spawn_cell = new_spawn_cell
+
+		room_id = new_room_id
 		combat_group_id = new_combat_group_id
 
 
@@ -34,11 +39,13 @@ func _init(
 func add_enemy(
 	enemy_id: String,
 	spawn_cell: Vector2i,
+	room_id: String = "",
 	combat_group_id: String = ""
 ) -> void:
 	var encounter_enemy := EncounterEnemy.new(
 		enemy_id,
 		spawn_cell,
+		room_id,
 		combat_group_id
 	)
 

@@ -1,27 +1,24 @@
 [gd_scene format=3 uid="uid://bmfi8ubryupeb"]
 
 [ext_resource type="Script" uid="uid://cvwe41x5ap6ge" path="res://scripts/core/game.gd" id="1_uwrxv"]
-[ext_resource type="Script" uid="uid://3jbhk6pxy8nt" path="res://scripts/combat/grid.gd" id="2_yqjtg"]
 [ext_resource type="Script" uid="uid://cweq1lfvmvglo" path="res://scripts/core/player.gd" id="3_lnu2h"]
 [ext_resource type="Script" uid="uid://cd3revhfdhmpv" path="res://scripts/ui/card_bar.gd" id="5_iywne"]
+[ext_resource type="Script" uid="uid://cohqojn544ius" path="res://scripts/world/room_area.gd" id="5_p57ef"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_y84t8"]
 radius = 18.0
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_y84t8"]
-size = Vector2(180, 40)
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_sycl5"]
+size = Vector2(500, 300)
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_lbhrr"]
-size = Vector2(40, 180)
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_efsbm"]
+size = Vector2(500, 300)
 
 [node name="Game" type="Node2D" unique_id=1125710800]
 script = ExtResource("1_uwrxv")
 
-[node name="Grid" type="Node2D" parent="." unique_id=133906913]
-position = Vector2(250, 20)
-script = ExtResource("2_yqjtg")
-
 [node name="Player" type="CharacterBody2D" parent="." unique_id=214993590]
+position = Vector2(120, 300)
 script = ExtResource("3_lnu2h")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=291482109]
@@ -36,13 +33,13 @@ offset_right = 40.0
 offset_bottom = 40.0
 
 [node name="CombatPanel" type="Panel" parent="UI/HUD" unique_id=1667139331]
-custom_minimum_size = Vector2(240, 260)
+custom_minimum_size = Vector2(360, 260)
 custom_maximum_size = Vector2(0, 0)
 layout_mode = 0
 offset_left = 20.0
 offset_top = 20.0
-offset_right = 20.0
-offset_bottom = 20.0
+offset_right = 380.0
+offset_bottom = 280.0
 
 [node name="HPLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1036347661]
 layout_mode = 0
@@ -56,15 +53,15 @@ text = "HP: 30/30"
 layout_mode = 0
 offset_left = 10.0
 offset_top = 40.0
-offset_right = 91.0
+offset_right = 350.0
 offset_bottom = 63.0
-text = "Azioni: 2/2"
+text = "PA: 3/3  Sforzo: 0/6  Reazione: -"
 
 [node name="StateLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1573503359]
 layout_mode = 0
 offset_left = 10.0
 offset_top = 70.0
-offset_right = 128.0
+offset_right = 350.0
 offset_bottom = 93.0
 text = "ESPLORAZIONE"
 
@@ -72,33 +69,34 @@ text = "ESPLORAZIONE"
 layout_mode = 0
 offset_left = 10.0
 offset_top = 100.0
-offset_right = 50.0
+offset_right = 350.0
 offset_bottom = 123.0
 text = "Nemico: 25/25 HP"
 
 [node name="TargetPartLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1209258386]
 custom_minimum_size = Vector2(10, 130)
 layout_mode = 0
+offset_left = 10.0
 offset_top = 130.0
-offset_right = 86.0
+offset_right = 350.0
 offset_bottom = 260.0
-text = "Mira: Testa"
+text = "Mira carte: Testa"
 
 [node name="PlayerStatusLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=615252701]
-custom_maximum_size = Vector2(220, 40)
+custom_maximum_size = Vector2(340, 40)
 layout_mode = 0
 offset_left = 10.0
 offset_top = 160.0
-offset_right = 230.0
+offset_right = 350.0
 offset_bottom = 200.0
 autowrap_mode = 3
 
 [node name="EnemyStatusLabel" type="Label" parent="UI/HUD/CombatPanel" unique_id=1127790825]
-custom_maximum_size = Vector2(220, 45)
+custom_maximum_size = Vector2(340, 45)
 layout_mode = 0
 offset_left = 10.0
 offset_top = 205.0
-offset_right = 230.0
+offset_right = 350.0
 offset_bottom = 250.0
 autowrap_mode = 3
 
@@ -119,12 +117,26 @@ script = ExtResource("5_iywne")
 
 [node name="ExplorationWorld" type="Node2D" parent="." unique_id=568176476]
 
-[node name="Wall1" type="StaticBody2D" parent="ExplorationWorld" unique_id=1706390828]
+[node name="Room_A" type="Area2D" parent="ExplorationWorld" unique_id=2075155680]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="ExplorationWorld/Wall1" unique_id=793528023]
-shape = SubResource("RectangleShape2D_y84t8")
+[node name="Walls" type="Node2D" parent="ExplorationWorld/Room_A" unique_id=1588117751]
 
-[node name="Wall2" type="StaticBody2D" parent="ExplorationWorld" unique_id=1897981078]
+[node name="Room_Area" type="Area2D" parent="ExplorationWorld/Room_A" unique_id=2011321811]
+position = Vector2(300, 300)
+script = ExtResource("5_p57ef")
+room_id = "limbo_room_a"
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="ExplorationWorld/Wall2" unique_id=336793980]
-shape = SubResource("RectangleShape2D_lbhrr")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ExplorationWorld/Room_A/Room_Area" unique_id=1656183961]
+shape = SubResource("RectangleShape2D_sycl5")
+
+[node name="Room_B" type="Area2D" parent="ExplorationWorld" unique_id=1994850660]
+
+[node name="Walls" type="Node2D" parent="ExplorationWorld/Room_B" unique_id=1497909074]
+
+[node name="Room_Area" type="Area2D" parent="ExplorationWorld/Room_B" unique_id=1482607203]
+position = Vector2(900, 300)
+script = ExtResource("5_p57ef")
+room_id = "limbo_room_b"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="ExplorationWorld/Room_B/Room_Area" unique_id=761458050]
+shape = SubResource("RectangleShape2D_efsbm")

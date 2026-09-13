@@ -52,7 +52,6 @@ static func _create_test_enemy() -> EnemyData:
 		},
 		"",
 		0,
-		0,
 		"",
 		EnemyData.PERCEPTION_SIGHT,
 		150.0
@@ -71,7 +70,6 @@ static func _create_senza_volto() -> EnemyData:
 			"Gambe": 14
 		},
 		"",
-		0,
 		0,
 		"",
 		EnemyData.PERCEPTION_SIGHT,
@@ -92,7 +90,6 @@ static func _create_trascinato() -> EnemyData:
 		},
 		EnemyAbilitySystem.ACTION_CHAIN_PULL,
 		3,
-		1,
 		"Braccia",
 		EnemyData.PERCEPTION_SIGHT,
 		130.0
@@ -112,7 +109,6 @@ static func _create_vegliante() -> EnemyData:
 		},
 		EnemyAbilitySystem.ACTION_RANGED_ATTACK,
 		5,
-		0,
 		"Occhio",
 		EnemyData.PERCEPTION_SIGHT,
 		230.0
@@ -132,7 +128,6 @@ static func _create_sordo() -> EnemyData:
 			"Gambe": 16
 		},
 		"",
-		0,
 		0,
 		"",
 		EnemyData.PERCEPTION_NOISE,
