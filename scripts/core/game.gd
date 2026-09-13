@@ -848,22 +848,12 @@ func _apply_card_effects(
 			card.status_stacks
 		)
 
-		print(
-			"Stato applicato: ",
-			card.status_to_apply
-		)
-
 	if card.fracture_selected_part:
 		var target_part: String = (
 			_get_selected_body_part()
 		)
 
 		target_enemy.apply_fracture(
-			target_part
-		)
-
-		print(
-			"Frattura applicata a: ",
 			target_part
 		)
 
@@ -980,7 +970,6 @@ func _push_enemy(
 				enemy_unit,
 				source_card
 			)
-
 			return
 
 		grid.remove_occupied_cell(
@@ -1059,11 +1048,6 @@ func _apply_collision_card_effect(
 		card.collision_status_to_apply,
 		card.collision_status_duration,
 		card.collision_status_stacks
-	)
-
-	print(
-		"Collisione: applicato ",
-		card.collision_status_to_apply
 	)
 
 	_update_ui()
@@ -1214,7 +1198,6 @@ func _run_next_enemy_turn() -> void:
 		_run_enemy_turn(
 			enemy_unit
 		)
-
 		return
 
 	enemy_is_moving = false
@@ -1300,35 +1283,32 @@ func _run_enemy_turn(
 		)
 		return
 
-	if (
-		enemy_unit.can_use_special_ability()
-		and enemy_unit.get_special_ability() == "chain_pull"
-		and distance_to_player >= 2
-		and distance_to_player <= enemy_unit.get_special_range()
-		and _has_clear_straight_line(
+	var special_action: Dictionary = (
+		EnemyAbilitySystem.get_special_action(
+			enemy_unit,
 			enemy_cell,
-			player_cell
+			player_cell,
+			grid
 		)
-	):
-		_enemy_chain_pull(
-			enemy_unit
-		)
-		return
+	)
 
-	if (
-		enemy_unit.can_use_special_ability()
-		and enemy_unit.get_special_ability() == "ranged_attack"
-		and distance_to_player >= 2
-		and distance_to_player <= enemy_unit.get_special_range()
-		and _has_clear_straight_line(
-			enemy_cell,
-			player_cell
-		)
+	match special_action.get(
+		"type",
+		EnemyAbilitySystem.ACTION_NONE
 	):
-		_enemy_ranged_attack(
-			enemy_unit
-		)
-		return
+		EnemyAbilitySystem.ACTION_CHAIN_PULL:
+			_execute_chain_pull_action(
+				enemy_unit,
+				special_action
+			)
+			return
+
+		EnemyAbilitySystem.ACTION_RANGED_ATTACK:
+			_execute_ranged_action(
+				enemy_unit,
+				special_action
+			)
+			return
 
 	var move_range: int = (
 		enemy_unit.get_move_range()
@@ -1421,90 +1401,16 @@ func _run_enemy_turn(
 	)
 
 
-func _has_clear_straight_line(
-	from_cell: Vector2i,
-	to_cell: Vector2i
-) -> bool:
-	if (
-		from_cell.x != to_cell.x
-		and from_cell.y != to_cell.y
-	):
-		return false
-
-	var direction := Vector2i(
-		signi(
-			to_cell.x - from_cell.x
-		),
-		signi(
-			to_cell.y - from_cell.y
-		)
-	)
-
-	var current_cell: Vector2i = (
-		from_cell + direction
-	)
-
-	while current_cell != to_cell:
-		if grid.is_cell_blocked(
-			current_cell
-		):
-			return false
-
-		if grid.is_cell_occupied(
-			current_cell
-		):
-			return false
-
-		current_cell += direction
-
-	return true
-
-
-func _enemy_chain_pull(
-	enemy_unit: EnemyUnit
+func _execute_chain_pull_action(
+	enemy_unit: EnemyUnit,
+	action: Dictionary
 ) -> void:
-	var enemy_cell: Vector2i = (
-		_get_enemy_cell(
-			enemy_unit
+	var final_cell: Vector2i = (
+		action.get(
+			"target_cell",
+			player_cell
 		)
 	)
-
-	var direction := Vector2i(
-		signi(
-			enemy_cell.x - player_cell.x
-		),
-		signi(
-			enemy_cell.y - player_cell.y
-		)
-	)
-
-	var pull_distance: int = (
-		enemy_unit.get_special_pull_distance()
-	)
-
-	var final_cell: Vector2i = player_cell
-
-	for _step in range(
-		pull_distance
-	):
-		var next_cell: Vector2i = (
-			final_cell + direction
-		)
-
-		if next_cell == enemy_cell:
-			break
-
-		if not grid.is_cell_inside(
-			next_cell
-		):
-			break
-
-		if not grid.is_cell_walkable(
-			next_cell
-		):
-			break
-
-		final_cell = next_cell
 
 	print(
 		enemy_unit.get_enemy_name(),
@@ -1548,11 +1454,15 @@ func _enemy_chain_pull(
 	)
 
 
-func _enemy_ranged_attack(
-	enemy_unit: EnemyUnit
+func _execute_ranged_action(
+	enemy_unit: EnemyUnit,
+	action: Dictionary
 ) -> void:
-	var damage: int = (
-		enemy_unit.get_attack_damage()
+	var damage: int = int(
+		action.get(
+			"damage",
+			0
+		)
 	)
 
 	if player_statuses.consume_marked():
