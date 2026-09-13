@@ -11,8 +11,9 @@ const ACTION_MOVE := "move"
 static func choose_action(
 	enemy_unit: EnemyUnit,
 	enemy_cell: Vector2i,
-	player_cell: Vector2i,
-	grid: Node
+	target_cell: Vector2i,
+	grid: Node,
+	can_attack_target: bool = true
 ) -> Dictionary:
 	if enemy_unit == null:
 		return _none()
@@ -20,42 +21,52 @@ static func choose_action(
 	if enemy_unit.is_dead():
 		return _none()
 
-	var distance_to_player: int = (
+	if target_cell == Vector2i(-1, -1):
+		return _none()
+
+	var distance_to_target: int = (
 		_grid_distance(
 			enemy_cell,
-			player_cell
-		)
-	)
-
-	if distance_to_player == 1:
-		return {
-			"type": ACTION_MELEE
-		}
-
-	var special_action: Dictionary = (
-		EnemyAbilitySystem.get_special_action(
-			enemy_unit,
-			enemy_cell,
-			player_cell,
-			grid
+			target_cell
 		)
 	)
 
 	if (
-		special_action.get(
-			"type",
-			EnemyAbilitySystem.ACTION_NONE
-		)
-		!= EnemyAbilitySystem.ACTION_NONE
+		can_attack_target
+		and distance_to_target == 1
 	):
 		return {
-			"type": ACTION_SPECIAL,
-			"special_action": special_action
+			"type": ACTION_MELEE,
+			"target_cell": target_cell
 		}
+
+	if can_attack_target:
+		var special_action: Dictionary = (
+			EnemyAbilitySystem.get_special_action(
+				enemy_unit,
+				enemy_cell,
+				target_cell,
+				grid
+			)
+		)
+
+		if (
+			special_action.get(
+				"type",
+				EnemyAbilitySystem.ACTION_NONE
+			)
+			!= EnemyAbilitySystem.ACTION_NONE
+		):
+			return {
+				"type": ACTION_SPECIAL,
+				"target_cell": target_cell,
+				"special_action": special_action
+			}
 
 	if enemy_unit.get_move_range() > 0:
 		return {
-			"type": ACTION_MOVE
+			"type": ACTION_MOVE,
+			"target_cell": target_cell
 		}
 
 	return _none()
@@ -70,12 +81,8 @@ static func _grid_distance(
 	)
 
 	return (
-		absi(
-			difference.x
-		)
-		+ absi(
-			difference.y
-		)
+		absi(difference.x)
+		+ absi(difference.y)
 	)
 
 

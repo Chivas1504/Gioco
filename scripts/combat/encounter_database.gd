@@ -37,4 +37,9 @@ static func _create_limbo_test() -> EncounterData:
 		Vector2i(6, 4)
 	)
 
+	encounter.add_enemy(
+		EnemyDatabase.SORDO,
+		Vector2i(8, 8)
+	)
+
 	return encounter

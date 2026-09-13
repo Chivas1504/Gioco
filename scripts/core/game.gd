@@ -35,6 +35,7 @@ var player_cell: Vector2i = Vector2i(0, 0)
 var player_hp: int = PLAYER_MAX_HP
 
 var player_statuses: StatusManager = StatusManager.new()
+var noise_system: NoiseSystem = NoiseSystem.new()
 
 
 var enemy_units: Array[EnemyUnit] = []
@@ -553,6 +554,16 @@ func _move_player_along_path() -> void:
 	tween.finished.connect(
 		func() -> void:
 			player_cell = next_cell
+
+			noise_system.emit_noise(
+				player_cell
+			)
+
+			print(
+				"Rumore generato a ",
+				player_cell
+			)
+
 			_move_player_along_path()
 	)
 
@@ -1270,12 +1281,40 @@ func _run_enemy_turn(
 
 		return
 
+	var target_cell: Vector2i = player_cell
+	var can_attack_target: bool = true
+
+	if enemy_unit.get_enemy_name() == "Il Sordo":
+		if not noise_system.has_active_noise():
+			print(
+				"Il Sordo non percepisce alcuna vibrazione."
+			)
+
+			_finish_single_enemy_turn(
+				enemy_unit
+			)
+			return
+
+		target_cell = (
+			noise_system.get_last_noise_cell()
+		)
+
+		can_attack_target = (
+			target_cell == player_cell
+		)
+
+		print(
+			"Il Sordo percepisce rumore a ",
+			target_cell
+		)
+
 	var ai_action: Dictionary = (
 		EnemyAISystem.choose_action(
 			enemy_unit,
 			enemy_cell,
-			player_cell,
-			grid
+			target_cell,
+			grid,
+			can_attack_target
 		)
 	)
 
@@ -1306,8 +1345,16 @@ func _run_enemy_turn(
 			)
 
 		EnemyAISystem.ACTION_MOVE:
+			var move_target: Vector2i = (
+				ai_action.get(
+					"target_cell",
+					target_cell
+				)
+			)
+
 			_execute_enemy_move(
-				enemy_unit
+				enemy_unit,
+				move_target
 			)
 
 		_:
@@ -1347,7 +1394,8 @@ func _execute_enemy_special_action(
 
 
 func _execute_enemy_move(
-	enemy_unit: EnemyUnit
+	enemy_unit: EnemyUnit,
+	target_cell: Vector2i
 ) -> void:
 	var enemy_cell: Vector2i = (
 		_get_enemy_cell(
@@ -1365,6 +1413,22 @@ func _execute_enemy_move(
 		)
 		return
 
+	if enemy_cell == target_cell:
+		if (
+			enemy_unit.get_enemy_name() == "Il Sordo"
+			and target_cell != player_cell
+		):
+			print(
+				"Il Sordo raggiunge il rumore, ma non trova nessuno."
+			)
+
+			noise_system.clear_noise()
+
+		_finish_single_enemy_turn(
+			enemy_unit
+		)
+		return
+
 	grid.remove_occupied_cell(
 		enemy_cell
 	)
@@ -1372,7 +1436,7 @@ func _execute_enemy_move(
 	var path: Array[Vector2i] = (
 		grid.find_path(
 			enemy_cell,
-			player_cell
+			target_cell
 		)
 	)
 
@@ -1386,18 +1450,30 @@ func _execute_enemy_move(
 		)
 		return
 
-	if path.size() == 2:
-		_enemy_attack(
-			enemy_unit
+	var max_steps: int = (
+		path.size() - 1
+	)
+
+	if target_cell == player_cell:
+		max_steps = (
+			path.size() - 2
 		)
-		return
 
 	var steps_to_move: int = mini(
 		move_range,
-		path.size() - 2
+		max_steps
 	)
 
 	if steps_to_move <= 0:
+		if (
+			target_cell == player_cell
+			and path.size() == 2
+		):
+			_enemy_attack(
+				enemy_unit
+			)
+			return
+
 		_finish_single_enemy_turn(
 			enemy_unit
 		)
@@ -1440,11 +1516,21 @@ func _execute_enemy_move(
 
 	tween.finished.connect(
 		func() -> void:
+			if (
+				enemy_unit.get_enemy_name() == "Il Sordo"
+				and next_cell == target_cell
+				and target_cell != player_cell
+			):
+				print(
+					"Il Sordo raggiunge il rumore, ma non trova nessuno."
+				)
+
+				noise_system.clear_noise()
+
 			_finish_single_enemy_turn(
 				enemy_unit
 			)
 	)
-
 
 func _execute_chain_pull_action(
 	enemy_unit: EnemyUnit,

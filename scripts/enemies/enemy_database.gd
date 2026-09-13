@@ -6,6 +6,7 @@ const TEST_ENEMY := "test_enemy"
 const SENZA_VOLTO := "senza_volto"
 const TRASCINATO := "trascinato"
 const VEGLIANTE := "vegliante"
+const SORDO := "sordo"
 
 
 static func get_enemy(
@@ -24,6 +25,9 @@ static func get_enemy(
 		VEGLIANTE:
 			return _create_vegliante()
 
+		SORDO:
+			return _create_sordo()
+
 		_:
 			push_error(
 				"Nemico sconosciuto: "
@@ -38,7 +42,8 @@ static func get_all_enemy_ids() -> Array[String]:
 		TEST_ENEMY,
 		SENZA_VOLTO,
 		TRASCINATO,
-		VEGLIANTE
+		VEGLIANTE,
+		SORDO
 	]
 
 
@@ -104,4 +109,19 @@ static func _create_vegliante() -> EnemyData:
 		5,
 		0,
 		"Occhio"
+	)
+
+
+static func _create_sordo() -> EnemyData:
+	return EnemyData.new(
+		"Il Sordo",
+		28,
+		7,
+		2,
+		{
+			"Testa": 12,
+			"Torso": 18,
+			"Braccia": 14,
+			"Gambe": 16
+		}
 	)
