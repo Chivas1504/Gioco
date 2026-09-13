@@ -17,6 +17,7 @@ var body_parts: Dictionary = {}
 
 var special_ability: String = ""
 var special_range: int = 0
+var special_pull_distance: int = 0
 var special_required_part: String = ""
 
 
@@ -32,6 +33,7 @@ func _init(
 	new_body_parts: Dictionary = {},
 	new_special_ability: String = "",
 	new_special_range: int = 0,
+	new_special_pull_distance: int = 0,
 	new_special_required_part: String = "",
 	new_detection_mode: String = PERCEPTION_SIGHT,
 	new_detection_range: float = 150.0
@@ -48,6 +50,7 @@ func _init(
 
 	special_ability = new_special_ability
 	special_range = new_special_range
+	special_pull_distance = new_special_pull_distance
 	special_required_part = new_special_required_part
 
 	detection_mode = new_detection_mode

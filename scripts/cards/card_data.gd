@@ -5,70 +5,55 @@ extends Resource
 var card_name: String = ""
 
 var action_cost: int = 1
-var effort_generated: int = 0
 
 var damage: int = 0
 var healing: int = 0
 
+var attack_range: int = 0
+
+var pull_distance: int = 0
+var push_distance: int = 0
+
 var tags: Array[String] = []
 
 
-# Stato applicato quando la carta colpisce.
-# La probabilita puo cambiare in base
-# alla situazione del bersaglio.
+# Stato applicato normalmente quando la carta colpisce.
 var status_to_apply: String = ""
 var status_duration: int = 0
 var status_stacks: int = 1
-var status_chance: float = 0.0
-var marked_status_bonus: float = 0.0
-var conditional_status_name: String = ""
-var conditional_status_bonus: float = 0.0
 
 
 # Alcune carte possono applicare Frattura
-# alla parte selezionata. La probabilita
-# viene calcolata dal combattimento usando
-# l'integrita residua della parte.
+# alla parte attualmente selezionata.
 var fracture_selected_part: bool = false
 
 
-# Requisito da finisher: 0.20 significa
-# usabile solo sotto il 20% di Vitalita.
-var low_vitality_required_ratio: float = 0.0
-
-
-# Reazioni preparate senza finestre di timing.
-var reaction_block: int = 0
-var reaction_effort_relief: int = 0
+# Stato applicato soltanto se l'effetto
+# provoca una collisione contro un ostacolo.
+var collision_status_to_apply: String = ""
+var collision_status_duration: int = 0
+var collision_status_stacks: int = 1
 
 
 func _init(
 	new_name: String = "",
 	new_action_cost: int = 1,
-	new_effort_generated: int = 0,
 	new_damage: int = 0,
 	new_healing: int = 0,
+	new_attack_range: int = 0,
+	new_pull_distance: int = 0,
+	new_push_distance: int = 0,
 	new_tags: Array[String] = []
 ) -> void:
 	card_name = new_name
 	action_cost = new_action_cost
-	effort_generated = new_effort_generated
 
 	damage = new_damage
 	healing = new_healing
 
+	attack_range = new_attack_range
+
+	pull_distance = new_pull_distance
+	push_distance = new_push_distance
+
 	tags = new_tags
-
-
-func uses_body_target() -> bool:
-	return (
-		"Mira" in tags
-		or fracture_selected_part
-	)
-
-
-func is_reaction() -> bool:
-	return (
-		"Reazione" in tags
-		or reaction_block > 0
-	)

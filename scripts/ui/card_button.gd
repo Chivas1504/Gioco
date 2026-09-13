@@ -49,21 +49,9 @@ func _update_card_text() -> void:
 	)
 
 	lines.append(
-		"PA: "
+		"Azioni: "
 		+ str(card_data.action_cost)
 	)
-
-	if card_data.effort_generated != 0:
-		var effort_prefix: String = "+"
-
-		if card_data.effort_generated < 0:
-			effort_prefix = ""
-
-		lines.append(
-			"Sforzo: "
-			+ effort_prefix
-			+ str(card_data.effort_generated)
-		)
 
 	if card_data.damage > 0:
 		lines.append(
@@ -75,6 +63,12 @@ func _update_card_text() -> void:
 		lines.append(
 			"Cura: "
 			+ str(card_data.healing)
+		)
+
+	if card_data.attack_range > 0:
+		lines.append(
+			"Portata: "
+			+ str(card_data.attack_range)
 		)
 
 	var effect_text: String = (
@@ -110,22 +104,16 @@ func _update_tooltip() -> void:
 			+ effect_text
 		)
 
-	if card_data.low_vitality_required_ratio > 0.0:
+	if card_data.pull_distance > 0:
 		tooltip_lines.append(
-			"Richiede Vitalita bersaglio sotto "
-			+ str(
-				roundi(
-					card_data.low_vitality_required_ratio
-					* 100.0
-				)
-			)
-			+ "%"
+			"Tira di "
+			+ str(card_data.pull_distance)
 		)
 
-	if card_data.reaction_block > 0:
+	if card_data.push_distance > 0:
 		tooltip_lines.append(
-			"Prepara una riduzione danno: "
-			+ str(card_data.reaction_block)
+			"Spinge di "
+			+ str(card_data.push_distance)
 		)
 
 	tooltip_text = "\n".join(
@@ -138,23 +126,9 @@ func _get_effect_text() -> String:
 		return ""
 
 	if card_data.fracture_selected_part:
-		return "Frattura condizionale"
+		return "Frattura"
 
 	if not card_data.status_to_apply.is_empty():
-		var chance_text: String = ""
-
-		if card_data.status_chance > 0.0:
-			chance_text = (
-				" "
-				+ str(
-					roundi(
-						card_data.status_chance
-						* 100.0
-					)
-				)
-				+ "%"
-			)
-
 		if (
 			card_data.status_to_apply
 			== StatusManager.BLEEDING
@@ -164,19 +138,18 @@ func _get_effect_text() -> String:
 				+ str(
 					card_data.status_stacks
 				)
-				+ chance_text
 			)
 
-		return (
-			card_data.status_to_apply
-			+ chance_text
-		)
+		return card_data.status_to_apply
 
-	if card_data.reaction_block > 0:
+	if (
+		not card_data
+		.collision_status_to_apply
+		.is_empty()
+	):
 		return (
-			"Reazione: -"
-			+ str(card_data.reaction_block)
-			+ " danno"
+			card_data.collision_status_to_apply
+			+ " su collisione"
 		)
 
 	return ""
