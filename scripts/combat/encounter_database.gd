@@ -29,17 +29,20 @@ static func _create_limbo_test() -> EncounterData:
 
 	encounter.add_enemy(
 		EnemyDatabase.TRASCINATO,
-		Vector2i(3, 0)
+		Vector2i(3, 0),
+		"room_a"
 	)
 
 	encounter.add_enemy(
 		EnemyDatabase.VEGLIANTE,
-		Vector2i(6, 4)
+		Vector2i(6, 4),
+		"room_a"
 	)
 
 	encounter.add_enemy(
 		EnemyDatabase.SORDO,
-		Vector2i(8, 8)
+		Vector2i(8, 8),
+		"room_b"
 	)
 
 	return encounter

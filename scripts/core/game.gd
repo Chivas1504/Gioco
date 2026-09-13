@@ -26,12 +26,10 @@ const ENEMY_MOVE_TIME := 0.18
 
 const EXPLORATION_MOVE_SPEED := 220.0
 
-const COMBAT_JOIN_RANGE := 260.0
 const COMBAT_MOVE_RANGE := 2
-
 const PLAYER_MAX_ACTIONS := 2
-const PLAYER_MAX_HP := 30
 
+const PLAYER_MAX_HP := 30
 const COLLISION_DAMAGE := 2
 
 
@@ -49,6 +47,8 @@ var enemy_units: Array[EnemyUnit] = []
 var active_combat_enemies: Array[EnemyUnit] = []
 
 var enemy_cells: Dictionary = {}
+var enemy_combat_groups: Dictionary = {}
+
 
 var selected_enemy: EnemyUnit
 var selected_body_part_index: int = 0
@@ -174,7 +174,7 @@ func _start_combat_from_enemy(
 		CombatParticipantSystem.build_combat_group(
 			trigger_enemy,
 			enemy_units,
-			COMBAT_JOIN_RANGE
+			enemy_combat_groups
 		)
 	)
 
@@ -183,6 +183,22 @@ func _start_combat_from_enemy(
 
 	selected_enemy = trigger_enemy
 	selected_body_part_index = 0
+
+	var group_id: String = ""
+
+	if enemy_combat_groups.has(
+		trigger_enemy
+	):
+		group_id = str(
+			enemy_combat_groups[
+				trigger_enemy
+			]
+		)
+
+	print(
+		"Gruppo di combattimento: ",
+		group_id
+	)
 
 	print(
 		"Nemici entrati nel combattimento: ",
@@ -228,9 +244,10 @@ func _enter_exploration_mode() -> void:
 	selected_enemy = null
 	selected_body_part_index = 0
 
+	_update_enemy_visibility()
 	_update_enemy_selection_visuals()
+	_update_grid_occupancy()
 	_update_ui()
-
 
 func _enter_combat_mode() -> void:
 	if player_is_dead:
@@ -259,6 +276,7 @@ func _enter_combat_mode() -> void:
 			_get_first_alive_combat_enemy()
 		)
 
+	_update_enemy_visibility()
 	_update_grid_occupancy()
 	_update_enemy_selection_visuals()
 
@@ -270,7 +288,6 @@ func _enter_combat_mode() -> void:
 	noise_system.clear_world_noise()
 
 	_begin_player_activation()
-
 
 func _snap_player_to_combat_grid() -> void:
 	var player_position_relative_to_grid: Vector2 = (
@@ -398,7 +415,9 @@ func _load_test_cards() -> void:
 func _setup_enemies() -> void:
 	enemy_units.clear()
 	active_combat_enemies.clear()
+
 	enemy_cells.clear()
+	enemy_combat_groups.clear()
 
 	var encounter: EncounterData = (
 		EncounterDatabase.get_encounter(
@@ -410,6 +429,7 @@ func _setup_enemies() -> void:
 		push_error(
 			"Impossibile caricare l'incontro."
 		)
+
 		return
 
 	for index in range(
@@ -420,6 +440,9 @@ func _setup_enemies() -> void:
 				index
 			)
 		)
+
+		if encounter_enemy == null:
+			continue
 
 		var enemy_data: EnemyData = (
 			EnemyDatabase.get_enemy(
@@ -447,6 +470,10 @@ func _setup_enemies() -> void:
 		enemy_cells[
 			enemy_unit
 		] = encounter_enemy.spawn_cell
+
+		enemy_combat_groups[
+			enemy_unit
+		] = encounter_enemy.combat_group_id
 
 		enemy_unit.position = (
 			grid.position
@@ -545,6 +572,7 @@ func _handle_grid_click(
 		_select_enemy(
 			clicked_enemy
 		)
+
 		return
 
 	if not grid.is_cell_walkable(
@@ -563,9 +591,8 @@ func _handle_grid_click(
 		return
 
 	var distance: int = path.size() - 1
-	var move_range: int = _get_player_move_range()
 
-	if distance > move_range:
+	if distance > _get_player_move_range():
 		return
 
 	current_path = path
@@ -605,7 +632,9 @@ func _get_enemy_at_cell(
 		if enemy_unit.is_dead():
 			continue
 
-		if _get_enemy_cell(enemy_unit) == cell:
+		if _get_enemy_cell(
+			enemy_unit
+		) == cell:
 			return enemy_unit
 
 	return null
@@ -666,7 +695,10 @@ func _update_enemy_selection_visuals() -> void:
 			and enemy_unit == selected_enemy
 			and enemy_unit in active_combat_enemies
 		):
-			enemy_unit.scale = Vector2(1.20, 1.20)
+			enemy_unit.scale = Vector2(
+				1.20,
+				1.20
+			)
 		else:
 			enemy_unit.scale = Vector2.ONE
 
@@ -688,7 +720,9 @@ func _select_previous_body_part() -> void:
 	selected_body_part_index -= 1
 
 	if selected_body_part_index < 0:
-		selected_body_part_index = parts.size() - 1
+		selected_body_part_index = (
+			parts.size() - 1
+		)
 
 	_update_ui()
 
@@ -812,7 +846,9 @@ func _is_card_available(
 		return false
 
 	if card.healing > 0:
-		return player_hp < PLAYER_MAX_HP
+		return (
+			player_hp < PLAYER_MAX_HP
+		)
 
 	if selected_enemy == null:
 		return false
@@ -856,7 +892,9 @@ func _is_card_available(
 func _get_effective_card_range(
 	card: CardData
 ) -> int:
-	var effective_range: int = card.attack_range
+	var effective_range: int = (
+		card.attack_range
+	)
 
 	if (
 		"Distanza" in card.tags
@@ -903,6 +941,7 @@ func _try_use_card(
 		_use_healing_card(
 			card
 		)
+
 		return
 
 	_use_attack_card(
@@ -929,6 +968,7 @@ func _use_attack_card(
 			card,
 			modified_damage
 		)
+
 		return
 
 	target_enemy.take_vitality_damage(
@@ -946,6 +986,7 @@ func _use_attack_card(
 		_finish_player_action(
 			card.action_cost
 		)
+
 		return
 
 	_apply_card_effects(
@@ -999,6 +1040,7 @@ func _use_aimed_attack(
 		_finish_player_action(
 			card.action_cost
 		)
+
 		return
 
 	_apply_card_effects(
@@ -1272,6 +1314,7 @@ func _begin_player_activation() -> bool:
 
 	if player_hp <= 0:
 		_player_died()
+
 		return false
 
 	if bool(
@@ -1311,6 +1354,7 @@ func _end_player_activation() -> bool:
 
 	if player_hp <= 0:
 		_player_died()
+
 		return false
 
 	return true
@@ -1368,6 +1412,7 @@ func _run_enemy_turn(
 		)
 
 		_run_next_enemy_turn()
+
 		return
 
 	var enemy_cell: Vector2i = (
@@ -1556,10 +1601,14 @@ func _execute_enemy_move(
 
 		return
 
-	var max_steps: int = path.size() - 1
+	var max_steps: int = (
+		path.size() - 1
+	)
 
 	if target_cell == player_cell:
-		max_steps = path.size() - 2
+		max_steps = (
+			path.size() - 2
+		)
 
 	var steps_to_move: int = mini(
 		move_range,
@@ -1701,6 +1750,7 @@ func _execute_ranged_action(
 
 	if player_hp <= 0:
 		_player_died()
+
 		return
 
 	_finish_single_enemy_turn(
@@ -1729,6 +1779,7 @@ func _enemy_attack(
 
 	if player_hp <= 0:
 		_player_died()
+
 		return
 
 	_finish_single_enemy_turn(
@@ -1839,6 +1890,7 @@ func _player_died() -> void:
 func _update_combat_display() -> void:
 	if not _is_combat_mode():
 		grid.clear_reachable_cells()
+
 		return
 
 	var reachable: Array[Vector2i] = (
@@ -1904,7 +1956,10 @@ func _update_status_labels() -> void:
 		selected_enemy == null
 		or selected_enemy.is_dead()
 	):
-		enemy_status_label.text = "Stati N: -"
+		enemy_status_label.text = (
+			"Stati N: -"
+		)
+
 		return
 
 	enemy_status_label.text = (
@@ -1919,16 +1974,24 @@ func _update_status_labels() -> void:
 func _update_ui() -> void:
 	hp_label.text = (
 		"HP: "
-		+ str(player_hp)
+		+ str(
+			player_hp
+		)
 		+ "/"
-		+ str(PLAYER_MAX_HP)
+		+ str(
+			PLAYER_MAX_HP
+		)
 	)
 
 	actions_label.text = (
 		"Azioni: "
-		+ str(player_actions_remaining)
+		+ str(
+			player_actions_remaining
+		)
 		+ "/"
-		+ str(PLAYER_MAX_ACTIONS)
+		+ str(
+			PLAYER_MAX_ACTIONS
+		)
 	)
 
 	if (
@@ -1939,9 +2002,13 @@ func _update_ui() -> void:
 		enemy_hp_label.text = (
 			selected_enemy.get_enemy_name()
 			+ ": "
-			+ str(selected_enemy.get_hp())
+			+ str(
+				selected_enemy.get_hp()
+			)
 			+ "/"
-			+ str(selected_enemy.get_max_hp())
+			+ str(
+				selected_enemy.get_max_hp()
+			)
 			+ " HP"
 		)
 
@@ -1950,7 +2017,9 @@ func _update_ui() -> void:
 		)
 
 		if selected_part.is_empty():
-			target_part_label.text = "Mira: -"
+			target_part_label.text = (
+				"Mira: -"
+			)
 		else:
 			target_part_label.text = (
 				"Mira: "
@@ -1970,21 +2039,32 @@ func _update_ui() -> void:
 			)
 
 	else:
-		enemy_hp_label.text = "Nemico: -"
-		target_part_label.text = "Mira: -"
+		enemy_hp_label.text = (
+			"Nemico: -"
+		)
+
+		target_part_label.text = (
+			"Mira: -"
+		)
 
 	_update_status_labels()
 	_refresh_card_bar()
 	_update_enemy_selection_visuals()
 
 	if player_is_dead:
-		state_label.text = "MORTO"
+		state_label.text = (
+			"MORTO"
+		)
 
 	elif _all_encounter_enemies_dead():
-		state_label.text = "AREA RIPULITA"
+		state_label.text = (
+			"AREA RIPULITA"
+		)
 
 	elif enemy_is_moving:
-		state_label.text = "TURNO NEMICI"
+		state_label.text = (
+			"TURNO NEMICI"
+		)
 
 	elif _is_combat_mode():
 		state_label.text = (
@@ -1996,7 +2076,9 @@ func _update_ui() -> void:
 		)
 
 	else:
-		state_label.text = "ESPLORAZIONE"
+		state_label.text = (
+			"ESPLORAZIONE"
+		)
 
 
 func _count_alive_combat_enemies() -> int:
@@ -2007,3 +2089,16 @@ func _count_alive_combat_enemies() -> int:
 			count += 1
 
 	return count
+	
+func _update_enemy_visibility() -> void:
+	for enemy_unit in enemy_units:
+		if enemy_unit.is_dead():
+			enemy_unit.visible = false
+			continue
+
+		if _is_combat_mode():
+			enemy_unit.visible = (
+				enemy_unit in active_combat_enemies
+			)
+		else:
+			enemy_unit.visible = true

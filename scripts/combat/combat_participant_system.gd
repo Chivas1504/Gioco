@@ -5,7 +5,7 @@ extends RefCounted
 static func build_combat_group(
 	trigger_enemy: EnemyUnit,
 	all_enemies: Array[EnemyUnit],
-	join_range: float
+	enemy_combat_groups: Dictionary
 ) -> Array[EnemyUnit]:
 	var result: Array[EnemyUnit] = []
 
@@ -15,36 +15,51 @@ static func build_combat_group(
 	if trigger_enemy.is_dead():
 		return result
 
-	result.append(
+	if not enemy_combat_groups.has(
 		trigger_enemy
+	):
+		result.append(
+			trigger_enemy
+		)
+
+		return result
+
+	var trigger_group_id: String = str(
+		enemy_combat_groups[
+			trigger_enemy
+		]
 	)
 
-	var index: int = 0
+	if trigger_group_id.is_empty():
+		result.append(
+			trigger_enemy
+		)
 
-	while index < result.size():
-		var source_enemy: EnemyUnit = result[index]
+		return result
 
-		for candidate in all_enemies:
-			if candidate == null:
-				continue
+	for enemy_unit in all_enemies:
+		if enemy_unit == null:
+			continue
 
-			if candidate.is_dead():
-				continue
+		if enemy_unit.is_dead():
+			continue
 
-			if candidate in result:
-				continue
+		if not enemy_combat_groups.has(
+			enemy_unit
+		):
+			continue
 
-			var distance: float = (
-				source_enemy.global_position.distance_to(
-					candidate.global_position
-				)
-			)
+		var enemy_group_id: String = str(
+			enemy_combat_groups[
+				enemy_unit
+			]
+		)
 
-			if distance <= join_range:
-				result.append(
-					candidate
-				)
+		if enemy_group_id != trigger_group_id:
+			continue
 
-		index += 1
+		result.append(
+			enemy_unit
+		)
 
 	return result
