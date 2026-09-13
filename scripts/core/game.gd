@@ -1240,16 +1240,16 @@ func _run_enemy_turn(
 		_run_next_enemy_turn()
 		return
 
+	var enemy_cell: Vector2i = (
+		_get_enemy_cell(
+			enemy_unit
+		)
+	)
+
 	var enemy_is_stunned: bool = bool(
 		activation.get(
 			"stunned",
 			false
-		)
-	)
-
-	var enemy_cell: Vector2i = (
-		_get_enemy_cell(
-			enemy_unit
 		)
 	)
 
@@ -1270,21 +1270,8 @@ func _run_enemy_turn(
 
 		return
 
-	var distance_to_player: int = (
-		_grid_distance(
-			enemy_cell,
-			player_cell
-		)
-	)
-
-	if distance_to_player == 1:
-		_enemy_attack(
-			enemy_unit
-		)
-		return
-
-	var special_action: Dictionary = (
-		EnemyAbilitySystem.get_special_action(
+	var ai_action: Dictionary = (
+		EnemyAISystem.choose_action(
 			enemy_unit,
 			enemy_cell,
 			player_cell,
@@ -1292,23 +1279,81 @@ func _run_enemy_turn(
 		)
 	)
 
-	match special_action.get(
-		"type",
-		EnemyAbilitySystem.ACTION_NONE
-	):
+	var action_type: String = str(
+		ai_action.get(
+			"type",
+			EnemyAISystem.ACTION_NONE
+		)
+	)
+
+	match action_type:
+		EnemyAISystem.ACTION_MELEE:
+			_enemy_attack(
+				enemy_unit
+			)
+
+		EnemyAISystem.ACTION_SPECIAL:
+			var special_action: Dictionary = (
+				ai_action.get(
+					"special_action",
+					{}
+				)
+			)
+
+			_execute_enemy_special_action(
+				enemy_unit,
+				special_action
+			)
+
+		EnemyAISystem.ACTION_MOVE:
+			_execute_enemy_move(
+				enemy_unit
+			)
+
+		_:
+			_finish_single_enemy_turn(
+				enemy_unit
+			)
+
+
+func _execute_enemy_special_action(
+	enemy_unit: EnemyUnit,
+	special_action: Dictionary
+) -> void:
+	var special_type: String = str(
+		special_action.get(
+			"type",
+			EnemyAbilitySystem.ACTION_NONE
+		)
+	)
+
+	match special_type:
 		EnemyAbilitySystem.ACTION_CHAIN_PULL:
 			_execute_chain_pull_action(
 				enemy_unit,
 				special_action
 			)
-			return
 
 		EnemyAbilitySystem.ACTION_RANGED_ATTACK:
 			_execute_ranged_action(
 				enemy_unit,
 				special_action
 			)
-			return
+
+		_:
+			_finish_single_enemy_turn(
+				enemy_unit
+			)
+
+
+func _execute_enemy_move(
+	enemy_unit: EnemyUnit
+) -> void:
+	var enemy_cell: Vector2i = (
+		_get_enemy_cell(
+			enemy_unit
+		)
+	)
 
 	var move_range: int = (
 		enemy_unit.get_move_range()
