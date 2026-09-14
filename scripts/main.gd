@@ -109,10 +109,10 @@ func _start_new_combat() -> void:
 
 
 func _refresh_ui() -> void:
-	var class_name := GameDatabase.get_class_name(run_state.active_class)
+	var active_class_name := GameDatabase.get_class_name(run_state.active_class)
 	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Mondo Lv %d" % [
 		run_state.player_level,
-		class_name,
+		active_class_name,
 		run_state.health,
 		run_state.max_health,
 		run_state.stamina,
