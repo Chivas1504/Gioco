@@ -1,21 +1,21 @@
 class_name RunState
 extends RefCounted
 
-var player_level := 1
-var max_health := CardRules.STARTING_HEALTH
-var health := CardRules.STARTING_HEALTH
-var max_stamina := CardRules.STARTING_STAMINA
-var stamina := CardRules.STARTING_STAMINA
+var player_level = 1
+var max_health = CardRules.STARTING_HEALTH
+var health = CardRules.STARTING_HEALTH
+var max_stamina = CardRules.STARTING_STAMINA
+var stamina = CardRules.STARTING_STAMINA
 
-var active_class := CardRules.CLASS_NEUTRAL
+var active_class = CardRules.CLASS_NEUTRAL
 var acquired_classes: Array = []
 var collection: Array = []
 var loadout: Array = []
 var consumable_slots: Array = []
-var card_levels := {}
+var card_levels = {}
 var artifacts: Array = []
 
-var materials := {
+var materials = {
 	"anime": 0,
 	"sangue": 0,
 	"ossa": 0,
@@ -62,8 +62,8 @@ func acquire_card(card_id: String) -> bool:
 	collection.append(card_id)
 	card_levels[card_id] = int(card_levels.get(card_id, 0))
 
-	var card := GameDatabase.get_card(card_id)
-	var card_class := card.get("class_id", CardRules.CLASS_NEUTRAL)
+	var card = GameDatabase.get_card(card_id)
+	var card_class = card.get("class_id", CardRules.CLASS_NEUTRAL)
 	if card_class != CardRules.CLASS_NEUTRAL and not acquired_classes.has(card_class):
 		acquired_classes.append(card_class)
 		if active_class == CardRules.CLASS_NEUTRAL:
@@ -108,7 +108,7 @@ func next_level_cost() -> int:
 
 
 func buy_level_up(card_id: String) -> bool:
-	var cost := next_level_cost()
+	var cost = next_level_cost()
 	if get_material("anime") < cost:
 		return false
 	spend_material("anime", cost)
@@ -119,11 +119,11 @@ func buy_level_up(card_id: String) -> bool:
 func level_up(card_id: String) -> void:
 	player_level += 1
 	if max_health < CardRules.STAT_CAP:
-		var health_gain := min(CardRules.LEVEL_STAT_GAIN, CardRules.STAT_CAP - max_health)
+		var health_gain = min(CardRules.LEVEL_STAT_GAIN, CardRules.STAT_CAP - max_health)
 		max_health += health_gain
 		health = min(max_health, health + health_gain)
 	if max_stamina < CardRules.STAT_CAP:
-		var stamina_gain := min(CardRules.LEVEL_STAT_GAIN, CardRules.STAT_CAP - max_stamina)
+		var stamina_gain = min(CardRules.LEVEL_STAT_GAIN, CardRules.STAT_CAP - max_stamina)
 		max_stamina += stamina_gain
 		stamina = min(max_stamina, stamina + stamina_gain)
 	if collection.has(card_id):

@@ -1,7 +1,7 @@
 class_name GameDatabase
 extends RefCounted
 
-const CLASSES := {
+const CLASSES = {
 	CardRules.CLASS_NEUTRAL: {
 		"name": "Senzaclasse",
 		"bonus": "Nessun bonus. Le carte neutrali non hanno penalita.",
@@ -24,7 +24,7 @@ const CLASSES := {
 	},
 }
 
-const BUILD_CARDS := [
+const BUILD_CARDS = [
 	{
 		"id": "neutral_rough_strike",
 		"name": "Colpo Rozzo",
@@ -227,7 +227,7 @@ const BUILD_CARDS := [
 	},
 ]
 
-const CONSUMABLES := [
+const CONSUMABLES = [
 	{
 		"id": "black_blood_vial",
 		"name": "Ampolla di Sangue Nero",
@@ -254,7 +254,7 @@ const CONSUMABLES := [
 	},
 ]
 
-const ARTIFACTS := [
+const ARTIFACTS = [
 	{
 		"id": "duelist_rosary",
 		"name": "Rosario del Duellante",
@@ -275,7 +275,7 @@ static func get_card(card_id: String) -> Dictionary:
 
 
 static func get_cards_by_class(class_id: String) -> Array:
-	var cards := []
+	var cards = []
 	for card in BUILD_CARDS:
 		if card.get("class_id") == class_id:
 			cards.append(card.duplicate(true))
@@ -287,28 +287,28 @@ static func get_class_name(class_id: String) -> String:
 
 
 static func get_base_stamina_cost(card: Dictionary, active_class: String) -> int:
-	var cost := int(card.get("cost", 0))
+	var cost = int(card.get("cost", 0))
 	if CardRules.is_off_class(card, active_class):
 		cost += CardRules.out_of_class_penalty(card.get("rarity", CardRules.RARITY_COMMON))
 	return cost
 
 
 static func get_card_power(card_id: String, card_level: int) -> int:
-	var card := get_card(card_id)
+	var card = get_card(card_id)
 	if card.is_empty():
 		return 0
 	return CardRules.rarity_power(card.get("rarity", CardRules.RARITY_COMMON)) + card_level
 
 
 static func get_world_level(collection: Array, card_levels: Dictionary) -> int:
-	var collection_power := 0
+	var collection_power = 0
 	for card_id in collection:
 		collection_power += get_card_power(card_id, int(card_levels.get(card_id, 0)))
 	return floori(float(collection_power) / 5.0)
 
 
 static func make_affamato_del_borgo(world_level: int) -> Dictionary:
-	var damage_bonus := floori(float(world_level) * 0.75)
+	var damage_bonus = floori(float(world_level) * 0.75)
 	return {
 		"id": "affamato_del_borgo",
 		"name": "Affamato del Borgo",
