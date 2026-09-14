@@ -2,7 +2,7 @@ extends Control
 
 var run_state := RunState.new()
 var combat_state := CombatState.new()
-var log_lines: Array[String] = []
+var log_lines: Array = []
 
 var player_label: Label
 var enemy_label: Label

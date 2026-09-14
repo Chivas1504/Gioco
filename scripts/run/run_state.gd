@@ -8,12 +8,12 @@ var max_stamina := CardRules.STARTING_STAMINA
 var stamina := CardRules.STARTING_STAMINA
 
 var active_class := CardRules.CLASS_NEUTRAL
-var acquired_classes: Array[String] = []
-var collection: Array[String] = []
-var loadout: Array[String] = []
-var consumable_slots: Array[String] = []
+var acquired_classes: Array = []
+var collection: Array = []
+var loadout: Array = []
+var consumable_slots: Array = []
 var card_levels := {}
-var artifacts: Array[String] = []
+var artifacts: Array = []
 
 var materials := {
 	"anime": 0,

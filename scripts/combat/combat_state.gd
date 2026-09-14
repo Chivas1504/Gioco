@@ -3,8 +3,8 @@ extends RefCounted
 
 var run_state: RunState
 var enemy := {}
-var used_card_ids: Array[String] = []
-var used_class_bonuses: Array[String] = []
+var used_card_ids: Array = []
+var used_class_bonuses: Array = []
 var guard := 0
 var enemy_strength_bonus := 0
 var weakened_next_intent := 0
@@ -119,9 +119,9 @@ func claim_enemy_rewards() -> Dictionary:
 	return {"ok": true, "message": "Ottieni %d anime." % souls}
 
 
-func _apply_card_effects(card: Dictionary, level: int) -> Array[String]:
+func _apply_card_effects(card: Dictionary, level: int) -> Array:
 	var effects: Dictionary = card.get("effects", {})
-	var messages: Array[String] = []
+	var messages: Array = []
 	var killed_before := enemy.get("health", 0) <= 0
 
 	if effects.has("self_damage"):
@@ -187,9 +187,11 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array[String]:
 		enemy["health"] = max(0, int(enemy.get("health", 0)) - damage)
 		messages.append("Infliggi %d danni." % damage)
 
-	var applies_ranger_bonus := run_state.active_class == CardRules.CLASS_RANGER \
-		and card.get("class_id") == CardRules.CLASS_RANGER \
+	var applies_ranger_bonus := (
+		run_state.active_class == CardRules.CLASS_RANGER
+		and card.get("class_id") == CardRules.CLASS_RANGER
 		and not used_class_bonuses.has(CardRules.CLASS_RANGER)
+	)
 	if effects.has("poison") or applies_ranger_bonus:
 		var poison := int(effects.get("poison", 0)) + level * int(effects.get("poison_per_level", 0))
 		if applies_ranger_bonus:
@@ -264,16 +266,20 @@ func _check_end_state() -> void:
 
 
 func _will_use_warrior_bonus(card: Dictionary) -> bool:
-	return run_state.active_class == CardRules.CLASS_WARRIOR \
-		and card.get("class_id") == CardRules.CLASS_WARRIOR \
+	return (
+		run_state.active_class == CardRules.CLASS_WARRIOR
+		and card.get("class_id") == CardRules.CLASS_WARRIOR
 		and not used_class_bonuses.has(CardRules.CLASS_WARRIOR)
+	)
 
 
 func _will_use_mage_bonus(card: Dictionary) -> bool:
-	return run_state.active_class == CardRules.CLASS_MAGE \
-		and card.get("class_id") == CardRules.CLASS_MAGE \
-		and not used_class_bonuses.has(CardRules.CLASS_MAGE) \
+	return (
+		run_state.active_class == CardRules.CLASS_MAGE
+		and card.get("class_id") == CardRules.CLASS_MAGE
+		and not used_class_bonuses.has(CardRules.CLASS_MAGE)
 		and temporary_cera + run_state.get_material("cera") > 0
+	)
 
 
 func _spend_cera_pool(amount: int) -> void:
