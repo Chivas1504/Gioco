@@ -122,12 +122,14 @@ func claim_enemy_rewards() -> Dictionary:
 		var recovered_souls = run_state.claim_shadow_victory(bool(enemy.get("second_encounter", false)), upgrade_id)
 		var reward_text = GameDatabase.get_shadow_upgrade_name(upgrade_id)
 		var bonus_souls = int(enemy.get("soul_reward", 0))
+		if bonus_souls < 1:
+			bonus_souls = _get_enemy_reward_souls()
 		run_state.add_material("anime", bonus_souls)
 		return {
 			"ok": true,
 			"message": "Spezzi l'Ombra: recuperi %d anime perdute, ottieni %d anime bonus e ricevi %s." % [recovered_souls, bonus_souls, reward_text],
 		}
-	var souls = int(enemy.get("soul_reward", 0))
+	var souls = _get_enemy_reward_souls()
 	run_state.add_material("anime", souls)
 	run_state.mark_current_node_resolved()
 	var fear_message = run_state.register_combat_without_level_up()
@@ -135,6 +137,24 @@ func claim_enemy_rewards() -> Dictionary:
 	if not fear_message.is_empty():
 		message += " " + fear_message
 	return {"ok": true, "message": message}
+
+
+func _get_enemy_reward_souls() -> int:
+	var souls = int(enemy.get("soul_reward", 0))
+	if souls > 0:
+		return souls
+
+	souls = 35 + run_state.get_world_level() * 8 + run_state.get_distance_from_start() * 2
+	var enemy_type = String(enemy.get("type", ""))
+	if bool(enemy.get("is_final_boss", false)):
+		souls += 160
+	elif enemy_type == "boss":
+		souls += 90
+	elif enemy_type == "miniboss":
+		souls += 45
+	if souls < 1:
+		souls = 1
+	return souls
 
 
 func _apply_card_effects(card: Dictionary, level: int) -> Array:

@@ -36,6 +36,11 @@ func _ready() -> void:
 	_refresh_ui()
 
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and card_grid != null:
+		_refresh_ui()
+
+
 func _build_ui() -> void:
 	var background = ColorRect.new()
 	background.color = Color(0.07, 0.06, 0.055)
@@ -89,13 +94,15 @@ func _build_ui() -> void:
 	status_row.add_child(intent_label)
 
 	var content_row = HBoxContainer.new()
+	content_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content_row.add_theme_constant_override("separation", 16)
 	root.add_child(content_row)
 
 	var left_column = VBoxContainer.new()
-	left_column.custom_minimum_size = Vector2(520, 0)
 	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_column.size_flags_stretch_ratio = 2.0
 	left_column.add_theme_constant_override("separation", 10)
 	content_row.add_child(left_column)
 
@@ -118,13 +125,14 @@ func _build_ui() -> void:
 	left_column.add_child(end_intent_button)
 
 	action_scroll = ScrollContainer.new()
-	action_scroll.custom_minimum_size = Vector2(360, 0)
+	action_scroll.custom_minimum_size = Vector2(300, 0)
+	action_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_scroll.size_flags_stretch_ratio = 1.0
 	action_scroll.horizontal_scroll_mode = 0
 	content_row.add_child(action_scroll)
 
 	safe_panel = VBoxContainer.new()
-	safe_panel.custom_minimum_size = Vector2(340, 0)
 	safe_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	safe_panel.add_theme_constant_override("separation", 8)
 	action_scroll.add_child(safe_panel)
@@ -144,7 +152,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _toggle_fullscreen() -> void:
 	var current_mode = DisplayServer.window_get_mode()
-	if current_mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
+	if current_mode == DisplayServer.WINDOW_MODE_FULLSCREEN or current_mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 	else:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -154,7 +162,8 @@ func _toggle_fullscreen() -> void:
 func _refresh_fullscreen_button() -> void:
 	if fullscreen_button == null:
 		return
-	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+	var current_mode = DisplayServer.window_get_mode()
+	if current_mode == DisplayServer.WINDOW_MODE_FULLSCREEN or current_mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
 		fullscreen_button.text = "Finestra"
 	else:
 		fullscreen_button.text = "Schermo intero"
@@ -315,7 +324,7 @@ func _render_menu_panel() -> void:
 
 
 func _render_cards() -> void:
-	card_grid.columns = 4
+	card_grid.columns = _get_combat_card_columns()
 	for child in card_grid.get_children():
 		child.queue_free()
 
@@ -344,14 +353,12 @@ func _render_safe_summary() -> void:
 		child.queue_free()
 
 	var summary = Label.new()
-	summary.custom_minimum_size = Vector2(620, 0)
 	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	summary.text = "Riposa, spendi anime, scegli una carta o prosegui verso il prossimo combattimento."
 	card_grid.add_child(summary)
 
 	var map_status = Label.new()
-	map_status.custom_minimum_size = Vector2(620, 0)
 	map_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	map_status.text = "Mappa: sei in %d,%d. Nodo attuale: %s. Il boss finale della tua classe e in %d,%d." % [
@@ -364,7 +371,6 @@ func _render_safe_summary() -> void:
 	card_grid.add_child(map_status)
 
 	var stats = Label.new()
-	stats.custom_minimum_size = Vector2(620, 0)
 	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stats.text = "Collezione: %d/%d | Loadout: %d/%d | Potenziamenti Ombra: %d" % [
@@ -697,3 +703,15 @@ func _rarity_label(rarity: String) -> String:
 			return "Leggendaria"
 		_:
 			return rarity
+
+
+func _get_combat_card_columns() -> int:
+	var available_width = card_grid.size.x
+	if available_width < 240.0:
+		available_width = get_viewport_rect().size.x - action_scroll.custom_minimum_size.x - 96.0
+	var columns = floori(available_width / 230.0)
+	if columns < 1:
+		columns = 1
+	if columns > 4:
+		columns = 4
+	return columns
