@@ -15,6 +15,8 @@ var consumable_slots: Array = []
 var card_levels = {}
 var artifacts: Array = []
 var special_upgrades: Array = []
+var last_victory_rewards = {}
+var pending_thief_restart_rewards = {}
 
 var fear = 0
 var combats_since_level_up = 0
@@ -41,6 +43,7 @@ func start_new_run(keep_shadow: bool = true) -> void:
 	var preserved_shadow = shadow_memory.duplicate(true)
 	var preserved_shadow_fled = shadow_first_encounter_fled
 	var preserved_shadow_defeated = shadow_defeated
+	var preserved_thief_rewards = pending_thief_restart_rewards.duplicate(true)
 	player_level = 1
 	max_health = CardRules.STARTING_HEALTH
 	health = max_health
@@ -67,6 +70,8 @@ func start_new_run(keep_shadow: bool = true) -> void:
 	card_levels = {}
 	artifacts = []
 	special_upgrades = []
+	last_victory_rewards = {}
+	pending_thief_restart_rewards = preserved_thief_rewards
 	materials = {
 		"anime": 0,
 		"sangue": 0,
@@ -76,6 +81,7 @@ func start_new_run(keep_shadow: bool = true) -> void:
 		"cenere": 0,
 		"frammenti_lunari": 0,
 	}
+	_apply_pending_thief_restart_rewards()
 	if keep_shadow:
 		shadow_memory = preserved_shadow
 		shadow_first_encounter_fled = preserved_shadow_fled
@@ -191,6 +197,7 @@ func register_combat_without_level_up() -> String:
 
 func create_shadow_from_current_run() -> Dictionary:
 	var lost_souls = get_material("anime")
+	_prepare_thief_restart_rewards()
 	shadow_memory = {
 		"active_class": active_class,
 		"collection": collection.duplicate(),
@@ -206,6 +213,32 @@ func create_shadow_from_current_run() -> Dictionary:
 	shadow_defeated = false
 	materials["anime"] = 0
 	return shadow_memory
+
+
+func record_victory_rewards(rewards: Dictionary) -> void:
+	last_victory_rewards = rewards.duplicate(true)
+
+
+func _prepare_thief_restart_rewards() -> void:
+	if active_class != CardRules.CLASS_THIEF:
+		return
+	pending_thief_restart_rewards = {}
+	for material_id in last_victory_rewards.keys():
+		var reward = floori(float(int(last_victory_rewards.get(material_id, 0))) * 0.5)
+		if reward > 0:
+			pending_thief_restart_rewards[material_id] = reward
+
+
+func _apply_pending_thief_restart_rewards() -> void:
+	if pending_thief_restart_rewards.is_empty():
+		return
+	for material_id in pending_thief_restart_rewards.keys():
+		add_material(String(material_id), int(pending_thief_restart_rewards.get(material_id, 0)))
+	pending_thief_restart_rewards = {}
+
+
+func get_pending_thief_restart_rewards() -> Dictionary:
+	return pending_thief_restart_rewards.duplicate(true)
 
 
 func has_shadow() -> bool:

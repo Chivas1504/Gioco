@@ -9,10 +9,10 @@ const MIN_WINDOW_SIZE = Vector2i(960, 540)
 const REWARD_POOL = [
 	"warrior_clean_slash",
 	"elf_quick_shot",
-	"mage_occult_dart",
+	"sorcerer_occult_dart",
 	"vampire_crimson_bite",
 	"werewolf_moon_rend",
-	"undead_bone_guard",
+	"zombie_bone_guard",
 	"ghost_phase_touch",
 	"cleric_blessed_mace",
 	"necromancer_grave_pact",
@@ -267,12 +267,14 @@ func _refresh_ui() -> void:
 			run_state.get_distance_to_final_boss(),
 		]
 	else:
-		enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d" % [
+		enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d | Sangue perso %d | Marchio %s" % [
 			combat_state.enemy.get("name", "Nemico"),
 			combat_state.enemy.get("health", 0),
 			combat_state.enemy.get("max_health", 0),
 			combat_state.enemy.get("poison", 0),
 			combat_state.enemy.get("burn", 0),
+			combat_state.enemy.get("bleed", 0),
+			"si" if bool(combat_state.enemy.get("marked", false)) else "no",
 		]
 		var intent = combat_state.current_intent()
 		if intent.get("kind") == "attack":
@@ -475,7 +477,7 @@ func _add_collection_section(title_text: String, card_ids: Array) -> void:
 		var level = run_state.get_card_level(card_id)
 		var level_text = " +%d" % level if level > 0 else ""
 		var class_id = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
-		var cost = GameDatabase.get_base_stamina_cost(card, run_state.active_class)
+		var cost = GameDatabase.get_base_stamina_cost(card, run_state.active_class, run_state.collection)
 		card_label.text = "%s%s | %s | %s | costo attuale %d\n%s" % [
 			card.get("name", card_id),
 			level_text,
@@ -709,12 +711,15 @@ func _on_flee_shadow_pressed() -> void:
 
 
 func _on_restart_run_pressed() -> void:
+	var thief_rewards = run_state.get_pending_thief_restart_rewards()
 	run_state.start_new_run(true)
 	has_current_run = true
 	defeat_snapshot_saved = false
 	screen_mode = SCREEN_SAFE
 	_prepare_safe_node_state()
 	_push_log("Nuova run. Da qualche parte, l'Ombra custodisce cio che hai perso.")
+	if not thief_rewards.is_empty():
+		_push_log("Il Ladro riparte con %d anime dell'ultimo bottino." % int(thief_rewards.get("anime", 0)))
 	_refresh_ui()
 
 
@@ -760,6 +765,8 @@ func _resolve_event_node() -> void:
 		"max_health": 0,
 		"poison": 0,
 		"burn": 0,
+		"bleed": 0,
+		"marked": false,
 		"intents": [],
 	}
 	screen_mode = SCREEN_SAFE
@@ -776,6 +783,8 @@ func _prepare_safe_node_state() -> void:
 		"max_health": 0,
 		"poison": 0,
 		"burn": 0,
+		"bleed": 0,
+		"marked": false,
 		"intents": [],
 	}
 

@@ -4,10 +4,10 @@ extends RefCounted
 const CLASS_NEUTRAL = "neutral"
 const CLASS_WARRIOR = "warrior"
 const CLASS_ELF = "elf"
-const CLASS_MAGE = "mage"
+const CLASS_SORCERER = "sorcerer"
 const CLASS_VAMPIRE = "vampire"
 const CLASS_WEREWOLF = "werewolf"
-const CLASS_UNDEAD = "undead"
+const CLASS_ZOMBIE = "zombie"
 const CLASS_GHOST = "ghost"
 const CLASS_CLERIC = "cleric"
 const CLASS_NECROMANCER = "necromancer"
@@ -69,6 +69,23 @@ static func out_of_class_penalty(rarity: String) -> int:
 	return OUT_OF_CLASS_STAMINA_PENALTY.get(rarity, 0)
 
 
+static func is_monster_class(class_id: String) -> bool:
+	return (
+		class_id == CLASS_VAMPIRE
+		or class_id == CLASS_WEREWOLF
+		or class_id == CLASS_ZOMBIE
+		or class_id == CLASS_GHOST
+	)
+
+
+static func is_class_match(card_class: String, active_class: String) -> bool:
+	if card_class == active_class:
+		return true
+	if active_class == CLASS_NECROMANCER:
+		return card_class == CLASS_ZOMBIE or card_class == CLASS_GHOST or card_class == CLASS_NECROMANCER
+	return false
+
+
 static func is_class_card(card: Dictionary) -> bool:
 	return card.get("class_id", CLASS_NEUTRAL) != CLASS_NEUTRAL
 
@@ -79,4 +96,4 @@ static func is_off_class(card: Dictionary, active_class: String) -> bool:
 		return false
 	if active_class == CLASS_NEUTRAL:
 		return false
-	return card_class != active_class
+	return not is_class_match(card_class, active_class)

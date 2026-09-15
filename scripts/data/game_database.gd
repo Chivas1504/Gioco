@@ -8,47 +8,47 @@ const CLASSES = {
 	},
 	CardRules.CLASS_WARRIOR: {
 		"name": "Guerriero",
-		"bonus": "La prima carta Guerriero usata contro ogni intento costa 1 stamina in meno.",
+		"bonus": "La carta leggendaria Guerriero si riattiva fino a due volte.",
 	},
 	CardRules.CLASS_ELF: {
 		"name": "Elfo",
-		"bonus": "La prima carta Elfo usata contro ogni intento applica +1 veleno.",
+		"bonus": "Vedi l'intento e il nemico e marchiato durante il tuo round.",
 	},
-	CardRules.CLASS_MAGE: {
-		"name": "Mago",
-		"bonus": "La prima carta Mago usata contro ogni intento costa 1 stamina in meno se hai cera.",
+	CardRules.CLASS_SORCERER: {
+		"name": "Stregone",
+		"bonus": "Il nemico e bruciato durante il tuo round; alcune carte scalano sulla bruciatura.",
 	},
 	CardRules.CLASS_VAMPIRE: {
 		"name": "Vampiro",
-		"bonus": "Quando uccidi un nemico, guadagni 1 sangue e recuperi 2 vita.",
+		"bonus": "A fine round recuperi vita dalla stamina spesa e indebolisci il nemico con il sangue accumulato.",
 	},
 	CardRules.CLASS_WEREWOLF: {
 		"name": "Lupo Mannaro",
-		"bonus": "Classe ferale. Bonus specifico da definire nelle prossime iterazioni.",
+		"bonus": "Il danno inflitto genera sangue; a fine round il sanguinamento del nemico ti restituisce stamina.",
 	},
-	CardRules.CLASS_UNDEAD: {
-		"name": "Non morto",
-		"bonus": "Classe resistente. Bonus specifico da definire nelle prossime iterazioni.",
+	CardRules.CLASS_ZOMBIE: {
+		"name": "Zombie",
+		"bonus": "Dopo ogni round le carte del nemico diventano piu pesanti e perdono efficacia.",
 	},
 	CardRules.CLASS_GHOST: {
 		"name": "Fantasma",
-		"bonus": "Classe evasiva. Bonus specifico da definire nelle prossime iterazioni.",
+		"bonus": "Il primo attacco nemico del combattimento ti attraversa.",
 	},
 	CardRules.CLASS_CLERIC: {
 		"name": "Chierico",
-		"bonus": "Classe sacra. Bonus specifico da definire nelle prossime iterazioni.",
+		"bonus": "Le carte maledette sono purificate e ignorano i debuff.",
 	},
 	CardRules.CLASS_NECROMANCER: {
 		"name": "Necromante",
-		"bonus": "Classe dei morti. Bonus specifico da definire nelle prossime iterazioni.",
+		"bonus": "Le carte Zombie e Fantasma sono considerate carte di classe.",
 	},
 	CardRules.CLASS_MONSTER_HUNTER: {
 		"name": "Cacciatore di Mostri",
-		"bonus": "Classe tecnica. Bonus specifico da definire nelle prossime iterazioni.",
+		"bonus": "Una sola carta per ogni classe mostro in collezione non subisce penalita fuori classe.",
 	},
 	CardRules.CLASS_THIEF: {
 		"name": "Ladro",
-		"bonus": "Classe opportunista. Bonus specifico da definire nelle prossime iterazioni.",
+		"bonus": "Quando muori, la nuova run riparte con meta delle anime dell'ultimo fight vinto.",
 	},
 	CardRules.CLASS_DJIN: {
 		"name": "Djin",
@@ -178,40 +178,40 @@ const BUILD_CARDS = [
 		"effects": {"damage": 6, "damage_per_level": 2, "poison": 8, "poison_per_level": 1, "mark_if_poisoned": true},
 	},
 	{
-		"id": "mage_occult_dart",
+		"id": "sorcerer_occult_dart",
 		"name": "Dardo Occulto",
 		"type": CardRules.TYPE_BUILD,
-		"class_id": CardRules.CLASS_MAGE,
+		"class_id": CardRules.CLASS_SORCERER,
 		"rarity": CardRules.RARITY_UNCOMMON,
 		"cost": 2,
-		"effect_text": "Infliggi 6 danni.",
-		"effects": {"damage": 6, "damage_per_level": 2},
+		"effect_text": "Infliggi 6 danni. Se il nemico brucia, infliggi +2 danni.",
+		"effects": {"damage": 6, "damage_per_level": 2, "bonus_if_burning": 2},
 	},
 	{
-		"id": "mage_wax_sigil",
+		"id": "sorcerer_wax_sigil",
 		"name": "Sigillo di Cera",
 		"type": CardRules.TYPE_BUILD,
-		"class_id": CardRules.CLASS_MAGE,
+		"class_id": CardRules.CLASS_SORCERER,
 		"rarity": CardRules.RARITY_UNCOMMON,
 		"cost": 1,
-		"effect_text": "Guadagni 1 cera temporanea. La prossima carta Mago infligge +2 danni.",
-		"effects": {"temporary_cera": 1, "next_mage_damage_bonus": 2},
+		"effect_text": "Guadagni 1 cera temporanea. La prossima carta Stregone infligge +2 danni.",
+		"effects": {"temporary_cera": 1, "next_sorcerer_damage_bonus": 2},
 	},
 	{
-		"id": "mage_black_flame",
+		"id": "sorcerer_black_flame",
 		"name": "Fiamma Nera",
 		"type": CardRules.TYPE_BUILD,
-		"class_id": CardRules.CLASS_MAGE,
+		"class_id": CardRules.CLASS_SORCERER,
 		"rarity": CardRules.RARITY_RARE,
 		"cost": 3,
-		"effect_text": "Infliggi 5 danni e applichi 3 bruciatura.",
-		"effects": {"damage": 5, "damage_per_level": 2, "burn": 3, "burn_per_level": 1},
+		"effect_text": "Infliggi 5 danni e applichi 3 bruciatura. Se il nemico brucia, applichi +1 bruciatura.",
+		"effects": {"damage": 5, "damage_per_level": 2, "burn": 3, "burn_per_level": 1, "extra_burn_if_burning": 1},
 	},
 	{
-		"id": "mage_black_sun",
+		"id": "sorcerer_black_sun",
 		"name": "Sole Nero",
 		"type": CardRules.TYPE_BUILD,
-		"class_id": CardRules.CLASS_MAGE,
+		"class_id": CardRules.CLASS_SORCERER,
 		"rarity": CardRules.RARITY_LEGENDARY,
 		"cost": 8,
 		"effect_text": "Infliggi 10 danni e applichi 4 bruciatura. Con 3 cera, ripeti la bruciatura.",
@@ -268,10 +268,10 @@ const BUILD_CARDS = [
 		"effects": {"damage": 5, "damage_per_level": 2, "recover_stamina_on_kill": 2},
 	},
 	{
-		"id": "undead_bone_guard",
+		"id": "zombie_bone_guard",
 		"name": "Guardia d'Ossa",
 		"type": CardRules.TYPE_BUILD,
-		"class_id": CardRules.CLASS_UNDEAD,
+		"class_id": CardRules.CLASS_ZOMBIE,
 		"rarity": CardRules.RARITY_UNCOMMON,
 		"cost": 2,
 		"effect_text": "Infliggi 2 danni e ottieni 6 guardia.",
@@ -410,11 +410,25 @@ static func get_class_name(class_id: String) -> String:
 	return String(class_data.get("name", "Senzaclasse"))
 
 
-static func get_base_stamina_cost(card: Dictionary, active_class: String) -> int:
+static func get_base_stamina_cost(card: Dictionary, active_class: String, collection: Array = []) -> int:
 	var cost = int(card.get("cost", 0))
-	if CardRules.is_off_class(card, active_class):
+	if _has_off_class_stamina_penalty(card, active_class, collection):
 		cost += CardRules.out_of_class_penalty(card.get("rarity", CardRules.RARITY_COMMON))
 	return cost
+
+
+static func _has_off_class_stamina_penalty(card: Dictionary, active_class: String, collection: Array) -> bool:
+	if not CardRules.is_off_class(card, active_class):
+		return false
+	var card_class = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	if active_class == CardRules.CLASS_MONSTER_HUNTER and CardRules.is_monster_class(card_class):
+		var class_count = 0
+		for card_id in collection:
+			var owned_card = get_card(card_id)
+			if String(owned_card.get("class_id", CardRules.CLASS_NEUTRAL)) == card_class:
+				class_count += 1
+		return class_count > 1
+	return true
 
 
 static func get_card_power(card_id: String, card_level: int) -> int:
