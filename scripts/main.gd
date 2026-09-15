@@ -3,6 +3,8 @@ extends Control
 const SCREEN_MENU = "menu"
 const SCREEN_COMBAT = "combat"
 const SCREEN_SAFE = "safe"
+const BASE_WINDOW_SIZE = Vector2i(1280, 720)
+const MIN_WINDOW_SIZE = Vector2i(960, 540)
 
 const REWARD_POOL = [
 	"warrior_clean_slash",
@@ -31,6 +33,7 @@ var end_intent_button: Button
 var defeat_snapshot_saved = false
 
 func _ready() -> void:
+	_configure_game_window()
 	_build_ui()
 	_show_start_menu()
 	_refresh_ui()
@@ -39,6 +42,18 @@ func _ready() -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED and card_grid != null:
 		_refresh_ui()
+
+
+func _configure_game_window() -> void:
+	var game_window = get_window()
+	game_window.min_size = MIN_WINDOW_SIZE
+	game_window.content_scale_size = BASE_WINDOW_SIZE
+	game_window.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	game_window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	game_window.content_scale_stretch = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
+	game_window.unresizable = false
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_WINDOWED:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 
 
 func _build_ui() -> void:
@@ -146,7 +161,7 @@ func _build_ui() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F11:
+		if event.keycode == KEY_F11 or (event.alt_pressed and event.keycode == KEY_ENTER):
 			_toggle_fullscreen()
 
 

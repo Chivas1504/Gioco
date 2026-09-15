@@ -6,7 +6,7 @@ Prototipo Godot 4 per un roguelike deckbuilding 2D senza pesca, con carte sempre
 
 - Vita e stamina partono da 30.
 - Il gioco parte da un menu iniziale con Nuova run e Run corrente.
-- La finestra e ridimensionabile, usa stretch viewport e puoi alternare fullscreen con `F11` o il bottone Schermo intero.
+- La finestra parte massimizzata, e ridimensionabile, usa stretch canvas e puoi alternare fullscreen con `F11`, `Alt+Invio` o il bottone Schermo intero.
 - Perdi se vita o stamina arrivano a 0.
 - Loadout iniziale di 4 carte neutrali.
 - Le carte usate tornano disponibili dopo la risoluzione dell'intento nemico.
