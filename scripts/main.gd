@@ -1,17 +1,8 @@
 extends Control
 
-var run_state = RunState.new()
-var combat_state = CombatState.new()
-var log_lines: Array = []
-
-var player_label: Label
-var enemy_label: Label
-var intent_label: Label
-var log_label: RichTextLabel
-var card_grid: GridContainer
-var safe_panel: VBoxContainer
-var end_intent_button: Button
-var defeat_snapshot_saved = false
+const SCREEN_MENU = "menu"
+const SCREEN_COMBAT = "combat"
+const SCREEN_SAFE = "safe"
 
 const REWARD_POOL = [
 	"warrior_clean_slash",
@@ -20,11 +11,26 @@ const REWARD_POOL = [
 	"vampire_crimson_bite",
 ]
 
+var run_state = RunState.new()
+var combat_state = CombatState.new()
+var log_lines: Array = []
+var screen_mode = SCREEN_MENU
+var has_current_run = false
+
+var screen_title: Label
+var player_label: Label
+var enemy_label: Label
+var intent_label: Label
+var log_label: RichTextLabel
+var cards_title: Label
+var card_grid: GridContainer
+var safe_panel: VBoxContainer
+var end_intent_button: Button
+var defeat_snapshot_saved = false
+
 func _ready() -> void:
-	run_state.start_new_run()
-	_start_new_combat()
 	_build_ui()
-	_push_log("La run comincia. Hai 30 vita, 30 stamina e nessuna classe.")
+	_show_start_menu()
 	_refresh_ui()
 
 
@@ -43,10 +49,10 @@ func _build_ui() -> void:
 	root.offset_bottom = -20
 	add_child(root)
 
-	var title = Label.new()
-	title.text = "Inferno Roguelike - Combat Prototype V0.1"
-	title.add_theme_font_size_override("font_size", 24)
-	root.add_child(title)
+	screen_title = Label.new()
+	screen_title.text = "Inferno Roguelike - Combat Prototype V0.1"
+	screen_title.add_theme_font_size_override("font_size", 24)
+	root.add_child(screen_title)
 
 	var status_row = HBoxContainer.new()
 	status_row.add_theme_constant_override("separation", 24)
@@ -74,7 +80,7 @@ func _build_ui() -> void:
 	left_column.add_theme_constant_override("separation", 10)
 	content_row.add_child(left_column)
 
-	var cards_title = Label.new()
+	cards_title = Label.new()
 	cards_title.text = "Carte build disponibili"
 	cards_title.add_theme_font_size_override("font_size", 18)
 	left_column.add_child(cards_title)
@@ -104,6 +110,30 @@ func _build_ui() -> void:
 	root.add_child(log_label)
 
 
+func _show_start_menu() -> void:
+	screen_mode = SCREEN_MENU
+
+
+func _start_new_run_from_menu() -> void:
+	run_state.start_new_run(true)
+	has_current_run = true
+	log_lines = []
+	_push_log("La run comincia. Hai 30 vita, 30 stamina e nessuna classe.")
+	_start_new_combat()
+	screen_mode = SCREEN_COMBAT
+	_refresh_ui()
+
+
+func _resume_current_run() -> void:
+	if not has_current_run:
+		return
+	if combat_state.ended and combat_state.victory:
+		screen_mode = SCREEN_SAFE
+	else:
+		screen_mode = SCREEN_COMBAT
+	_refresh_ui()
+
+
 func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 	defeat_snapshot_saved = false
 	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
@@ -111,6 +141,7 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 		return
 	var enemy = GameDatabase.make_affamato_del_borgo(run_state.get_world_level())
 	combat_state.start_combat(run_state, enemy)
+	screen_mode = SCREEN_COMBAT
 
 
 func _start_shadow_combat(second_encounter: bool) -> void:
@@ -121,9 +152,15 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 		_push_log("La tua Ombra ritorna. Questa volta non puoi fuggire.")
 	else:
 		_push_log("La tua Ombra ti aspetta con le anime perdute.")
+	screen_mode = SCREEN_COMBAT
 
 
 func _refresh_ui() -> void:
+	if screen_mode == SCREEN_MENU:
+		_render_start_menu()
+		log_label.text = "\n".join(log_lines)
+		return
+
 	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Paura %d | Mondo Lv %d" % [
 		run_state.player_level,
 		GameDatabase.get_class_name(run_state.active_class),
@@ -151,9 +188,68 @@ func _refresh_ui() -> void:
 	else:
 		intent_label.text = "Intento: -"
 
-	_render_cards()
+	if screen_mode == SCREEN_SAFE:
+		screen_title.text = "Falò / Shop"
+		cards_title.text = "Run corrente"
+		end_intent_button.visible = false
+		_render_safe_summary()
+	else:
+		screen_title.text = "Combattimento"
+		cards_title.text = "Carte build disponibili"
+		end_intent_button.visible = true
+		_render_cards()
 	_render_safe_panel()
 	log_label.text = "\n".join(log_lines)
+
+
+func _render_start_menu() -> void:
+	screen_title.text = "Inferno Roguelike"
+	player_label.text = ""
+	enemy_label.text = ""
+	intent_label.text = ""
+	cards_title.text = "Menu"
+	end_intent_button.visible = false
+	_render_menu_buttons()
+	_render_menu_panel()
+
+
+func _render_menu_buttons() -> void:
+	for child in card_grid.get_children():
+		child.queue_free()
+
+	var new_run_button = Button.new()
+	new_run_button.custom_minimum_size = Vector2(260, 70)
+	new_run_button.text = "Nuova run"
+	new_run_button.pressed.connect(_start_new_run_from_menu)
+	card_grid.add_child(new_run_button)
+
+	var continue_button = Button.new()
+	continue_button.custom_minimum_size = Vector2(260, 70)
+	continue_button.text = "Run corrente"
+	continue_button.disabled = not has_current_run
+	continue_button.pressed.connect(_resume_current_run)
+	card_grid.add_child(continue_button)
+
+
+func _render_menu_panel() -> void:
+	for child in safe_panel.get_children():
+		child.queue_free()
+
+	var title = Label.new()
+	title.text = "Prototipo V0.1"
+	title.add_theme_font_size_override("font_size", 18)
+	safe_panel.add_child(title)
+
+	var description = Label.new()
+	description.text = "Avvia una nuova run o torna alla run corrente della sessione."
+	description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	safe_panel.add_child(description)
+
+	if run_state.has_shadow():
+		var shadow = Label.new()
+		shadow.text = "Ombra presente: %d anime perdute." % int(run_state.shadow_memory.get("lost_souls", 0))
+		shadow.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		safe_panel.add_child(shadow)
 
 
 func _render_cards() -> void:
@@ -179,18 +275,48 @@ func _render_cards() -> void:
 		card_grid.add_child(button)
 
 
+func _render_safe_summary() -> void:
+	for child in card_grid.get_children():
+		child.queue_free()
+
+	var summary = Label.new()
+	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	summary.text = "Riposa, spendi anime, scegli una carta o prosegui verso il prossimo combattimento."
+	card_grid.add_child(summary)
+
+	var stats = Label.new()
+	stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stats.text = "Collezione: %d/%d | Loadout: %d/%d | Potenziamenti Ombra: %d" % [
+		run_state.collection.size(),
+		CardRules.COLLECTION_MAX,
+		run_state.loadout.size(),
+		CardRules.LOADOUT_MAX,
+		run_state.special_upgrades.size(),
+	]
+	card_grid.add_child(stats)
+
+	for upgrade_id in run_state.special_upgrades:
+		var upgrade = Label.new()
+		upgrade.text = GameDatabase.get_shadow_upgrade_name(upgrade_id)
+		card_grid.add_child(upgrade)
+
+
 func _render_safe_panel() -> void:
 	for child in safe_panel.get_children():
 		child.queue_free()
 
 	var title = Label.new()
-	title.text = "Falò / Shop di test"
+	title.text = "Falò / Shop di test" if screen_mode == SCREEN_SAFE else "Azioni"
 	title.add_theme_font_size_override("font_size", 18)
 	safe_panel.add_child(title)
 
+	if screen_mode == SCREEN_SAFE:
+		_render_shop_controls()
+		return
+
 	if not combat_state.ended:
 		var hint = Label.new()
-		hint.text = "Disponibile dopo la vittoria."
+		hint.text = "Il Falò/Shop si apre dopo la vittoria."
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		safe_panel.add_child(hint)
 		if bool(combat_state.enemy.get("is_shadow", false)):
@@ -220,6 +346,14 @@ func _render_safe_panel() -> void:
 		safe_panel.add_child(restart_button)
 		return
 
+	if combat_state.victory:
+		var enter_shop_button = Button.new()
+		enter_shop_button.text = "Vai al Falò / Shop"
+		enter_shop_button.pressed.connect(_enter_safe_area)
+		safe_panel.add_child(enter_shop_button)
+
+
+func _render_shop_controls() -> void:
 	if not combat_state.rewards_claimed:
 		var claim_button = Button.new()
 		claim_button.text = "Raccogli anime"
@@ -269,9 +403,14 @@ func _render_safe_panel() -> void:
 
 	var next_button = Button.new()
 	next_button.text = "Nuovo combattimento"
-	next_button.disabled = run_state.can_start_forced_shadow_encounter()
+	next_button.disabled = run_state.can_start_forced_shadow_encounter() or not combat_state.rewards_claimed
 	next_button.pressed.connect(_on_new_combat_pressed)
 	safe_panel.add_child(next_button)
+
+	var menu_button = Button.new()
+	menu_button.text = "Torna al menu"
+	menu_button.pressed.connect(_on_menu_pressed)
+	safe_panel.add_child(menu_button)
 
 
 func _on_card_pressed(card_id: String) -> void:
@@ -279,6 +418,7 @@ func _on_card_pressed(card_id: String) -> void:
 	_push_log(result.get("message", ""))
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade. Le carte torneranno disponibili nel prossimo combattimento.")
+		_enter_safe_area()
 	elif combat_state.ended:
 		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
@@ -290,6 +430,7 @@ func _on_end_intent_pressed() -> void:
 	_push_log(result.get("message", ""))
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade.")
+		_enter_safe_area()
 	elif combat_state.ended:
 		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
@@ -345,10 +486,20 @@ func _on_flee_shadow_pressed() -> void:
 
 func _on_restart_run_pressed() -> void:
 	run_state.start_new_run(true)
+	has_current_run = true
 	defeat_snapshot_saved = false
 	_start_new_combat()
 	_push_log("Nuova run. Da qualche parte, l'Ombra custodisce cio che hai perso.")
 	_refresh_ui()
+
+
+func _on_menu_pressed() -> void:
+	_show_start_menu()
+	_refresh_ui()
+
+
+func _enter_safe_area() -> void:
+	screen_mode = SCREEN_SAFE
 
 
 func _save_shadow_after_defeat() -> void:

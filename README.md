@@ -5,6 +5,7 @@ Prototipo Godot 4 per un roguelike deckbuilding 2D senza pesca, con carte sempre
 ## Regole implementate
 
 - Vita e stamina partono da 30.
+- Il gioco parte da un menu iniziale con Nuova run e Run corrente.
 - Perdi se vita o stamina arrivano a 0.
 - Loadout iniziale di 4 carte neutrali.
 - Le carte usate tornano disponibili dopo la risoluzione dell'intento nemico.
@@ -21,6 +22,7 @@ Prototipo Godot 4 per un roguelike deckbuilding 2D senza pesca, con carte sempre
 - Il primo incontro con l'Ombra e opzionale: puoi fuggire, ma la paura aumenta di 50.
 - Se fuggi, l'Ombra puo tornare quando la paura arriva a 90; nel secondo incontro non puoi fuggire.
 - Sconfiggere l'Ombra recupera le anime perdute e assegna un potenziamento speciale.
+- Dopo una vittoria passi alla schermata Falò / Shop.
 
 ## File principali
 
