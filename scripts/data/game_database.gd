@@ -267,6 +267,17 @@ const ARTIFACTS = [
 	},
 ]
 
+const SHADOW_UPGRADES = {
+	"shadow_echo": {
+		"name": "Eco del Caduto",
+		"effect_text": "Promemoria speciale: hai sconfitto la tua Ombra e recuperato le anime perdute.",
+	},
+	"deep_shadow_echo": {
+		"name": "Eco della Notte Profonda",
+		"effect_text": "Promemoria speciale: hai sconfitto l'Ombra ritornata dopo la fuga.",
+	},
+}
+
 static func get_card(card_id: String) -> Dictionary:
 	for card in BUILD_CARDS:
 		if card.get("id") == card_id:
@@ -283,7 +294,8 @@ static func get_cards_by_class(class_id: String) -> Array:
 
 
 static func get_class_name(class_id: String) -> String:
-	return CLASSES.get(class_id, CLASSES[CardRules.CLASS_NEUTRAL]).get("name", "Senzaclasse")
+	var class_data = CLASSES.get(class_id, CLASSES[CardRules.CLASS_NEUTRAL])
+	return String(class_data.get("name", "Senzaclasse"))
 
 
 static func get_base_stamina_cost(card: Dictionary, active_class: String) -> int:
@@ -327,3 +339,57 @@ static func make_affamato_del_borgo(world_level: int) -> Dictionary:
 			{"name": "Ringhio", "kind": "buff", "strength": 2},
 		],
 	}
+
+
+static func make_shadow_boss(shadow_memory: Dictionary, fear: int, second_encounter: bool) -> Dictionary:
+	var old_loadout = shadow_memory.get("loadout", [])
+	var old_levels = shadow_memory.get("card_levels", {})
+	var shadow_world_level = int(shadow_memory.get("world_level", 0))
+	var lost_souls = int(shadow_memory.get("lost_souls", 0))
+	var fear_bonus = floori(float(fear) / 10.0)
+	var build_power = 0
+	for card_id in old_loadout:
+		build_power += get_card_power(card_id, int(old_levels.get(card_id, 0)))
+
+	var power_bonus = floori(float(build_power) / 4.0)
+	var health = 34 + shadow_world_level * 4 + power_bonus * 2 + fear_bonus * 2
+	var damage = 7 + shadow_world_level + fear_bonus + floori(float(power_bonus) / 2.0)
+	var soul_reward = 25 + shadow_world_level * 10
+	var boss_name = "Ombra del Caduto"
+	var special_upgrade = "shadow_echo"
+	if second_encounter:
+		health = floori(float(health) * 1.35)
+		damage = floori(float(damage) * 1.25) + 2
+		soul_reward += 40
+		boss_name = "Ombra Divorante"
+		special_upgrade = "deep_shadow_echo"
+
+	return {
+		"id": "shadow_boss",
+		"name": boss_name,
+		"type": "shadow",
+		"is_shadow": true,
+		"second_encounter": second_encounter,
+		"max_health": health,
+		"health": health,
+		"guard": 0,
+		"poison": 0,
+		"burn": 0,
+		"marked": false,
+		"intent_index": 0,
+		"soul_reward": soul_reward,
+		"lost_souls": lost_souls,
+		"special_upgrade": special_upgrade,
+		"intents": [
+			{"name": "Eco della vecchia build", "kind": "attack", "damage": damage},
+			{"name": "Ricordo spezzato", "kind": "buff", "strength": 3 if second_encounter else 2},
+			{"name": "Colpo d'Ombra", "kind": "attack", "damage": damage + 3},
+		],
+	}
+
+
+static func get_shadow_upgrade_name(upgrade_id: String) -> String:
+	var upgrade = SHADOW_UPGRADES.get(upgrade_id, {})
+	if typeof(upgrade) != TYPE_DICTIONARY:
+		return upgrade_id
+	return String(upgrade.get("name", upgrade_id))

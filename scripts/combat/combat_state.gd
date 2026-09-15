@@ -15,6 +15,7 @@ var next_mage_damage_bonus = 0
 var ended = false
 var victory = false
 var rewards_claimed = false
+var low_health_fear_triggered = false
 
 func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
@@ -31,6 +32,7 @@ func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	ended = false
 	victory = false
 	rewards_claimed = false
+	low_health_fear_triggered = false
 
 
 func current_intent() -> Dictionary:
@@ -99,6 +101,7 @@ func resolve_enemy_intent() -> Dictionary:
 			incoming = ceili(float(incoming) * next_damage_multiplier)
 			run_state.health = max(0, run_state.health - incoming)
 			messages.append("%s: subisci %d danni, %d bloccati." % [intent.get("name", "Intento"), incoming, blocked])
+			_check_low_health_fear(messages)
 		elif intent.get("kind") == "buff":
 			enemy_strength_bonus += int(intent.get("strength", 0))
 			messages.append("%s: il nemico diventa piu feroce." % intent.get("name", "Intento"))
@@ -114,9 +117,23 @@ func claim_enemy_rewards() -> Dictionary:
 	if not ended or not victory or rewards_claimed:
 		return {"ok": false, "message": ""}
 	rewards_claimed = true
+	if bool(enemy.get("is_shadow", false)):
+		var upgrade_id = String(enemy.get("special_upgrade", "shadow_echo"))
+		var recovered_souls = run_state.claim_shadow_victory(bool(enemy.get("second_encounter", false)), upgrade_id)
+		var reward_text = GameDatabase.get_shadow_upgrade_name(upgrade_id)
+		var bonus_souls = int(enemy.get("soul_reward", 0))
+		run_state.add_material("anime", bonus_souls)
+		return {
+			"ok": true,
+			"message": "Spezzi l'Ombra: recuperi %d anime perdute, ottieni %d anime bonus e ricevi %s." % [recovered_souls, bonus_souls, reward_text],
+		}
 	var souls = int(enemy.get("soul_reward", 0))
 	run_state.add_material("anime", souls)
-	return {"ok": true, "message": "Ottieni %d anime." % souls}
+	var fear_message = run_state.register_combat_without_level_up()
+	var message = "Ottieni %d anime." % souls
+	if not fear_message.is_empty():
+		message += " " + fear_message
+	return {"ok": true, "message": message}
 
 
 func _apply_card_effects(card: Dictionary, level: int) -> Array:
@@ -128,6 +145,7 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 		var self_damage = int(effects.get("self_damage", 0))
 		run_state.health = max(0, run_state.health - self_damage)
 		messages.append("Perdi %d vita." % self_damage)
+		_check_low_health_fear(messages)
 
 	if effects.has("recover_stamina"):
 		var stamina_gain = int(effects.get("recover_stamina", 0)) + level * int(effects.get("recover_stamina_per_level", 0))
@@ -288,3 +306,13 @@ func _spend_cera_pool(amount: int) -> void:
 	var remaining = amount - from_temp
 	if remaining > 0:
 		run_state.spend_material("cera", remaining)
+
+
+func _check_low_health_fear(messages: Array) -> void:
+	if low_health_fear_triggered:
+		return
+	if not run_state.is_low_health():
+		return
+	low_health_fear_triggered = true
+	run_state.add_fear(CardRules.FEAR_LOW_HEALTH_GAIN)
+	messages.append("La vita scende troppo: la paura sale a %d." % run_state.fear)

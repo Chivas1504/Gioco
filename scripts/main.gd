@@ -11,6 +11,7 @@ var log_label: RichTextLabel
 var card_grid: GridContainer
 var safe_panel: VBoxContainer
 var end_intent_button: Button
+var defeat_snapshot_saved = false
 
 const REWARD_POOL = [
 	"warrior_clean_slash",
@@ -103,13 +104,27 @@ func _build_ui() -> void:
 	root.add_child(log_label)
 
 
-func _start_new_combat() -> void:
+func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
+	defeat_snapshot_saved = false
+	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
+		_start_shadow_combat(true)
+		return
 	var enemy = GameDatabase.make_affamato_del_borgo(run_state.get_world_level())
 	combat_state.start_combat(run_state, enemy)
 
 
+func _start_shadow_combat(second_encounter: bool) -> void:
+	defeat_snapshot_saved = false
+	var enemy = GameDatabase.make_shadow_boss(run_state.shadow_memory, run_state.fear, second_encounter)
+	combat_state.start_combat(run_state, enemy)
+	if second_encounter:
+		_push_log("La tua Ombra ritorna. Questa volta non puoi fuggire.")
+	else:
+		_push_log("La tua Ombra ti aspetta con le anime perdute.")
+
+
 func _refresh_ui() -> void:
-	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Mondo Lv %d" % [
+	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Paura %d | Mondo Lv %d" % [
 		run_state.player_level,
 		GameDatabase.get_class_name(run_state.active_class),
 		run_state.health,
@@ -118,6 +133,7 @@ func _refresh_ui() -> void:
 		run_state.max_stamina,
 		run_state.get_material("anime"),
 		run_state.get_material("sangue"),
+		run_state.fear,
 		run_state.get_world_level(),
 	]
 	enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d" % [
@@ -177,13 +193,31 @@ func _render_safe_panel() -> void:
 		hint.text = "Disponibile dopo la vittoria."
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		safe_panel.add_child(hint)
+		if bool(combat_state.enemy.get("is_shadow", false)):
+			var shadow_hint = Label.new()
+			if bool(combat_state.enemy.get("second_encounter", false)):
+				shadow_hint.text = "L'Ombra ritornata non permette fuga."
+			else:
+				shadow_hint.text = "Puoi fuggire dall'Ombra, ma la paura aumenta di 50."
+			shadow_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			safe_panel.add_child(shadow_hint)
+			if not bool(combat_state.enemy.get("second_encounter", false)):
+				var flee_button = Button.new()
+				flee_button.text = "Fuggi dall'Ombra (+50 Paura)"
+				flee_button.pressed.connect(_on_flee_shadow_pressed)
+				safe_panel.add_child(flee_button)
 		return
 
 	if not combat_state.victory:
+		_save_shadow_after_defeat()
 		var defeat = Label.new()
-		defeat.text = "Sei morto o hai finito stamina. Riavvia la scena per una nuova run."
+		defeat.text = "Sei morto o hai finito stamina. La tua Ombra custodisce le anime perdute."
 		defeat.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		safe_panel.add_child(defeat)
+		var restart_button = Button.new()
+		restart_button.text = "Nuova run"
+		restart_button.pressed.connect(_on_restart_run_pressed)
+		safe_panel.add_child(restart_button)
 		return
 
 	if not combat_state.rewards_claimed:
@@ -217,8 +251,25 @@ func _render_safe_panel() -> void:
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
 		safe_panel.add_child(level_button)
 
+	if run_state.has_shadow():
+		var shadow_title = Label.new()
+		shadow_title.text = "Ombra: %d anime perdute" % int(run_state.shadow_memory.get("lost_souls", 0))
+		safe_panel.add_child(shadow_title)
+		var shadow_button = Button.new()
+		if run_state.can_start_forced_shadow_encounter():
+			shadow_button.text = "Affronta l'Ombra ritornata"
+			shadow_button.pressed.connect(_on_shadow_boss_pressed.bind(true))
+		elif run_state.can_start_first_shadow_encounter():
+			shadow_button.text = "Affronta la tua Ombra"
+			shadow_button.pressed.connect(_on_shadow_boss_pressed.bind(false))
+		else:
+			shadow_button.text = "L'Ombra tornera a Paura 90"
+			shadow_button.disabled = true
+		safe_panel.add_child(shadow_button)
+
 	var next_button = Button.new()
 	next_button.text = "Nuovo combattimento"
+	next_button.disabled = run_state.can_start_forced_shadow_encounter()
 	next_button.pressed.connect(_on_new_combat_pressed)
 	safe_panel.add_child(next_button)
 
@@ -229,6 +280,7 @@ func _on_card_pressed(card_id: String) -> void:
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade. Le carte torneranno disponibili nel prossimo combattimento.")
 	elif combat_state.ended:
+		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
 	_refresh_ui()
 
@@ -239,6 +291,7 @@ func _on_end_intent_pressed() -> void:
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade.")
 	elif combat_state.ended:
+		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
 	_refresh_ui()
 
@@ -273,8 +326,41 @@ func _on_level_up_pressed(card_id: String) -> void:
 
 func _on_new_combat_pressed() -> void:
 	_start_new_combat()
-	_push_log("Un nuovo Affamato del Borgo emerge dal buio.")
+	if not bool(combat_state.enemy.get("is_shadow", false)):
+		_push_log("Un nuovo Affamato del Borgo emerge dal buio.")
 	_refresh_ui()
+
+
+func _on_shadow_boss_pressed(second_encounter: bool) -> void:
+	_start_shadow_combat(second_encounter)
+	_refresh_ui()
+
+
+func _on_flee_shadow_pressed() -> void:
+	var new_fear = run_state.flee_shadow()
+	_push_log("Fuggi dall'Ombra. La paura sale a %d." % new_fear)
+	_start_new_combat(true)
+	_refresh_ui()
+
+
+func _on_restart_run_pressed() -> void:
+	run_state.start_new_run(true)
+	defeat_snapshot_saved = false
+	_start_new_combat()
+	_push_log("Nuova run. Da qualche parte, l'Ombra custodisce cio che hai perso.")
+	_refresh_ui()
+
+
+func _save_shadow_after_defeat() -> void:
+	if defeat_snapshot_saved:
+		return
+	defeat_snapshot_saved = true
+	if bool(combat_state.enemy.get("is_shadow", false)):
+		run_state.materials["anime"] = 0
+		_push_log("L'Ombra resta intatta e le anime ti sfuggono ancora.")
+		return
+	var shadow = run_state.create_shadow_from_current_run()
+	_push_log("Nasce un'Ombra dalla build precedente: %d anime perdute." % int(shadow.get("lost_souls", 0)))
 
 
 func _push_log(message: String) -> void:
