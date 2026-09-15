@@ -18,6 +18,7 @@ var screen_mode = SCREEN_MENU
 var has_current_run = false
 
 var screen_title: Label
+var fullscreen_button: Button
 var player_label: Label
 var enemy_label: Label
 var intent_label: Label
@@ -25,6 +26,7 @@ var log_label: RichTextLabel
 var cards_title: Label
 var card_grid: GridContainer
 var safe_panel: VBoxContainer
+var action_scroll: ScrollContainer
 var end_intent_button: Button
 var defeat_snapshot_saved = false
 
@@ -49,24 +51,40 @@ func _build_ui() -> void:
 	root.offset_bottom = -20
 	add_child(root)
 
+	var title_row = HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 12)
+	root.add_child(title_row)
+
 	screen_title = Label.new()
 	screen_title.text = "Inferno Roguelike - Combat Prototype V0.1"
+	screen_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	screen_title.add_theme_font_size_override("font_size", 24)
-	root.add_child(screen_title)
+	title_row.add_child(screen_title)
 
-	var status_row = HBoxContainer.new()
-	status_row.add_theme_constant_override("separation", 24)
+	fullscreen_button = Button.new()
+	fullscreen_button.text = "Schermo intero"
+	fullscreen_button.pressed.connect(_toggle_fullscreen)
+	title_row.add_child(fullscreen_button)
+
+	var status_row = VBoxContainer.new()
+	status_row.add_theme_constant_override("separation", 4)
 	root.add_child(status_row)
 
 	player_label = Label.new()
+	player_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	player_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	player_label.add_theme_font_size_override("font_size", 18)
 	status_row.add_child(player_label)
 
 	enemy_label = Label.new()
+	enemy_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	enemy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	enemy_label.add_theme_font_size_override("font_size", 18)
 	status_row.add_child(enemy_label)
 
 	intent_label = Label.new()
+	intent_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	intent_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intent_label.add_theme_font_size_override("font_size", 18)
 	status_row.add_child(intent_label)
 
@@ -76,6 +94,7 @@ func _build_ui() -> void:
 	root.add_child(content_row)
 
 	var left_column = VBoxContainer.new()
+	left_column.custom_minimum_size = Vector2(520, 0)
 	left_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left_column.add_theme_constant_override("separation", 10)
 	content_row.add_child(left_column)
@@ -98,16 +117,47 @@ func _build_ui() -> void:
 	end_intent_button.pressed.connect(_on_end_intent_pressed)
 	left_column.add_child(end_intent_button)
 
+	action_scroll = ScrollContainer.new()
+	action_scroll.custom_minimum_size = Vector2(360, 0)
+	action_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_scroll.horizontal_scroll_mode = 0
+	content_row.add_child(action_scroll)
+
 	safe_panel = VBoxContainer.new()
-	safe_panel.custom_minimum_size = Vector2(320, 0)
+	safe_panel.custom_minimum_size = Vector2(340, 0)
+	safe_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	safe_panel.add_theme_constant_override("separation", 8)
-	content_row.add_child(safe_panel)
+	action_scroll.add_child(safe_panel)
 
 	log_label = RichTextLabel.new()
 	log_label.custom_minimum_size = Vector2(0, 160)
 	log_label.fit_content = true
 	log_label.scroll_following = true
 	root.add_child(log_label)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F11:
+			_toggle_fullscreen()
+
+
+func _toggle_fullscreen() -> void:
+	var current_mode = DisplayServer.window_get_mode()
+	if current_mode == DisplayServer.WINDOW_MODE_FULLSCREEN:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	_refresh_fullscreen_button()
+
+
+func _refresh_fullscreen_button() -> void:
+	if fullscreen_button == null:
+		return
+	if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN:
+		fullscreen_button.text = "Finestra"
+	else:
+		fullscreen_button.text = "Schermo intero"
 
 
 func _show_start_menu() -> void:
@@ -156,6 +206,7 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 
 
 func _refresh_ui() -> void:
+	_refresh_fullscreen_button()
 	if screen_mode == SCREEN_MENU:
 		_render_start_menu()
 		log_label.text = "\n".join(log_lines)
