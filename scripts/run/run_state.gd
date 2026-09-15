@@ -21,6 +21,11 @@ var combats_since_level_up = 0
 var shadow_memory = {}
 var shadow_first_encounter_fled = false
 var shadow_defeated = false
+var map_position = Vector2i(CardRules.START_MAP_X, CardRules.START_MAP_Y)
+var final_boss_position = Vector2i(CardRules.FINAL_BOSS_X, CardRules.FINAL_BOSS_Y)
+var map_nodes = {}
+var current_node = {}
+var game_won = false
 
 var materials = {
 	"anime": 0,
@@ -43,6 +48,12 @@ func start_new_run(keep_shadow: bool = true) -> void:
 	stamina = max_stamina
 	fear = 0
 	combats_since_level_up = 0
+	map_position = Vector2i(CardRules.START_MAP_X, CardRules.START_MAP_Y)
+	final_boss_position = Vector2i(CardRules.FINAL_BOSS_X, CardRules.FINAL_BOSS_Y)
+	map_nodes = {}
+	current_node = _get_or_create_node(map_position)
+	current_node["resolved"] = true
+	game_won = false
 	active_class = CardRules.CLASS_NEUTRAL
 	acquired_classes = []
 	collection = [
@@ -225,3 +236,96 @@ func claim_shadow_victory(second_encounter: bool, upgrade_id: String) -> int:
 	if second_encounter:
 		fear = max(0, fear - 50)
 	return recovered_souls
+
+
+func move_to_direction(direction: String) -> Dictionary:
+	var offset = Vector2i.ZERO
+	if direction == "north":
+		offset = Vector2i(0, -1)
+	elif direction == "south":
+		offset = Vector2i(0, 1)
+	elif direction == "east":
+		offset = Vector2i(1, 0)
+	elif direction == "west":
+		offset = Vector2i(-1, 0)
+	map_position += offset
+	current_node = _get_or_create_node(map_position)
+	return current_node
+
+
+func mark_current_node_resolved() -> void:
+	if current_node.is_empty():
+		return
+	current_node["resolved"] = true
+	map_nodes[_node_key(map_position)] = current_node
+	if String(current_node.get("type", "")) == "class_boss":
+		game_won = true
+
+
+func get_current_node_name() -> String:
+	if current_node.is_empty():
+		return "Sconosciuto"
+	return String(current_node.get("name", "Sconosciuto"))
+
+
+func get_current_node_type() -> String:
+	if current_node.is_empty():
+		return "unknown"
+	return String(current_node.get("type", "unknown"))
+
+
+func get_distance_from_start() -> int:
+	return abs(map_position.x - CardRules.START_MAP_X) + abs(map_position.y - CardRules.START_MAP_Y)
+
+
+func get_distance_to_final_boss() -> int:
+	return abs(map_position.x - final_boss_position.x) + abs(map_position.y - final_boss_position.y)
+
+
+func _get_or_create_node(position: Vector2i) -> Dictionary:
+	var key = _node_key(position)
+	if map_nodes.has(key):
+		var existing_node = map_nodes[key]
+		if typeof(existing_node) == TYPE_DICTIONARY:
+			return existing_node
+		return {}
+	var node = _generate_node(position)
+	map_nodes[key] = node
+	return node
+
+
+func _generate_node(position: Vector2i) -> Dictionary:
+	var distance = abs(position.x - CardRules.START_MAP_X) + abs(position.y - CardRules.START_MAP_Y)
+	var node_type = "combat"
+	var node_name = "Strada infestata"
+	if position == Vector2i(CardRules.START_MAP_X, CardRules.START_MAP_Y):
+		node_type = "campfire"
+		node_name = "Falò iniziale"
+	elif position == final_boss_position:
+		node_type = "class_boss"
+		node_name = "Soglia del Boss finale"
+	else:
+		var seed_value = abs(position.x * 92821 + position.y * 68917)
+		if seed_value % 17 == 0 and distance > 3:
+			node_type = "boss"
+			node_name = "Tana del Boss"
+		elif seed_value % 11 == 0 and distance > 2:
+			node_type = "miniboss"
+			node_name = "Covo del Mini-boss"
+		elif seed_value % 5 == 0:
+			node_type = "event"
+			node_name = "Evento oscuro"
+
+	return {
+		"key": _node_key(position),
+		"x": position.x,
+		"y": position.y,
+		"type": node_type,
+		"name": node_name,
+		"distance": distance,
+		"resolved": false,
+	}
+
+
+func _node_key(position: Vector2i) -> String:
+	return "%d,%d" % [position.x, position.y]

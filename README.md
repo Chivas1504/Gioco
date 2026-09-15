@@ -23,6 +23,9 @@ Prototipo Godot 4 per un roguelike deckbuilding 2D senza pesca, con carte sempre
 - Se fuggi, l'Ombra puo tornare quando la paura arriva a 90; nel secondo incontro non puoi fuggire.
 - Sconfiggere l'Ombra recupera le anime perdute e assegna un potenziamento speciale.
 - Dopo una vittoria passi alla schermata Falò / Shop.
+- La run usa una mappa a griglia: dal Falò/Shop puoi muoverti a nord, sud, est o ovest.
+- Ogni nodo della griglia puo contenere combattimenti, eventi, mini-boss, boss o il boss finale della classe.
+- La run parte dal punto A `(0,0)` e il prototipo mette il boss finale al punto B `(6,6)`.
 
 ## File principali
 

@@ -341,6 +341,57 @@ static func make_affamato_del_borgo(world_level: int) -> Dictionary:
 	}
 
 
+static func make_grid_enemy(node_data: Dictionary, world_level: int, active_class: String) -> Dictionary:
+	var node_type = String(node_data.get("type", "combat"))
+	var distance = int(node_data.get("distance", 0))
+	var active_class_label = get_class_name(active_class)
+	var health_bonus = distance + world_level * 3
+	var damage_bonus = floori(float(distance) / 2.0) + world_level
+	var enemy_name = "Affamato del Borgo"
+	var enemy_id = "grid_combat"
+	var soul_reward = 35 + world_level * 8 + distance * 2
+
+	if node_type == "miniboss":
+		enemy_name = "Mini-boss del Crocevia"
+		enemy_id = "grid_miniboss"
+		health_bonus += 18
+		damage_bonus += 3
+		soul_reward += 45
+	elif node_type == "boss":
+		enemy_name = "Orrore del Crocevia"
+		enemy_id = "grid_boss"
+		health_bonus += 34
+		damage_bonus += 5
+		soul_reward += 90
+	elif node_type == "class_boss":
+		enemy_name = "Boss finale: %s" % active_class_label
+		enemy_id = "class_final_boss"
+		health_bonus += 55
+		damage_bonus += 8
+		soul_reward += 160
+
+	var max_health = 16 + health_bonus
+	return {
+		"id": enemy_id,
+		"name": enemy_name,
+		"type": node_type,
+		"is_final_boss": node_type == "class_boss",
+		"max_health": max_health,
+		"health": max_health,
+		"guard": 0,
+		"poison": 0,
+		"burn": 0,
+		"marked": false,
+		"intent_index": 0,
+		"soul_reward": soul_reward,
+		"intents": [
+			{"name": "Assalto", "kind": "attack", "damage": 4 + damage_bonus},
+			{"name": "Pressione", "kind": "buff", "strength": 2 + floori(float(world_level) / 3.0)},
+			{"name": "Colpo feroce", "kind": "attack", "damage": 6 + damage_bonus},
+		],
+	}
+
+
 static func make_shadow_boss(shadow_memory: Dictionary, fear: int, second_encounter: bool) -> Dictionary:
 	var old_loadout = shadow_memory.get("loadout", [])
 	var old_levels = shadow_memory.get("card_levels", {})

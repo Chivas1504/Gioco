@@ -129,6 +129,7 @@ func claim_enemy_rewards() -> Dictionary:
 		}
 	var souls = int(enemy.get("soul_reward", 0))
 	run_state.add_material("anime", souls)
+	run_state.mark_current_node_resolved()
 	var fear_message = run_state.register_combat_without_level_up()
 	var message = "Ottieni %d anime." % souls
 	if not fear_message.is_empty():

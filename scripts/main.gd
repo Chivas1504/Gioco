@@ -118,9 +118,9 @@ func _start_new_run_from_menu() -> void:
 	run_state.start_new_run(true)
 	has_current_run = true
 	log_lines = []
-	_push_log("La run comincia. Hai 30 vita, 30 stamina e nessuna classe.")
-	_start_new_combat()
-	screen_mode = SCREEN_COMBAT
+	screen_mode = SCREEN_SAFE
+	_prepare_safe_node_state()
+	_push_log("La run comincia al Falò iniziale. Scegli una direzione sulla griglia.")
 	_refresh_ui()
 
 
@@ -139,7 +139,7 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
 		_start_shadow_combat(true)
 		return
-	var enemy = GameDatabase.make_affamato_del_borgo(run_state.get_world_level())
+	var enemy = GameDatabase.make_grid_enemy(run_state.current_node, run_state.get_world_level(), run_state.active_class)
 	combat_state.start_combat(run_state, enemy)
 	screen_mode = SCREEN_COMBAT
 
@@ -173,20 +173,30 @@ func _refresh_ui() -> void:
 		run_state.fear,
 		run_state.get_world_level(),
 	]
-	enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d" % [
-		combat_state.enemy.get("name", "Nemico"),
-		combat_state.enemy.get("health", 0),
-		combat_state.enemy.get("max_health", 0),
-		combat_state.enemy.get("poison", 0),
-		combat_state.enemy.get("burn", 0),
-	]
-	var intent = combat_state.current_intent()
-	if intent.get("kind") == "attack":
-		intent_label.text = "Intento: %s, %d danni" % [intent.get("name", ""), intent.get("damage", 0)]
-	elif intent.get("kind") == "buff":
-		intent_label.text = "Intento: %s, +%d forza" % [intent.get("name", ""), intent.get("strength", 0)]
+	if screen_mode == SCREEN_SAFE:
+		enemy_label.text = "Nodo: %s (%s)" % [run_state.get_current_node_name(), run_state.get_current_node_type()]
+		intent_label.text = "Posizione: %d,%d | Boss finale: %d,%d | Distanza: %d" % [
+			run_state.map_position.x,
+			run_state.map_position.y,
+			run_state.final_boss_position.x,
+			run_state.final_boss_position.y,
+			run_state.get_distance_to_final_boss(),
+		]
 	else:
-		intent_label.text = "Intento: -"
+		enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d" % [
+			combat_state.enemy.get("name", "Nemico"),
+			combat_state.enemy.get("health", 0),
+			combat_state.enemy.get("max_health", 0),
+			combat_state.enemy.get("poison", 0),
+			combat_state.enemy.get("burn", 0),
+		]
+		var intent = combat_state.current_intent()
+		if intent.get("kind") == "attack":
+			intent_label.text = "Intento: %s, %d danni" % [intent.get("name", ""), intent.get("damage", 0)]
+		elif intent.get("kind") == "buff":
+			intent_label.text = "Intento: %s, +%d forza" % [intent.get("name", ""), intent.get("strength", 0)]
+		else:
+			intent_label.text = "Intento: -"
 
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
@@ -289,6 +299,19 @@ func _render_safe_summary() -> void:
 	summary.text = "Riposa, spendi anime, scegli una carta o prosegui verso il prossimo combattimento."
 	card_grid.add_child(summary)
 
+	var map_status = Label.new()
+	map_status.custom_minimum_size = Vector2(620, 0)
+	map_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	map_status.text = "Mappa: sei in %d,%d. Nodo attuale: %s. Il boss finale della tua classe e in %d,%d." % [
+		run_state.map_position.x,
+		run_state.map_position.y,
+		run_state.get_current_node_name(),
+		run_state.final_boss_position.x,
+		run_state.final_boss_position.y,
+	]
+	card_grid.add_child(map_status)
+
 	var stats = Label.new()
 	stats.custom_minimum_size = Vector2(620, 0)
 	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -367,8 +390,10 @@ func _render_shop_controls() -> void:
 		claim_button.pressed.connect(_on_claim_rewards_pressed)
 		safe_panel.add_child(claim_button)
 
+	_render_level_shop_controls()
+
 	var reward_title = Label.new()
-	reward_title.text = "Scegli una carta"
+	reward_title.text = "Ricompensa carta"
 	safe_panel.add_child(reward_title)
 
 	for card_id in REWARD_POOL:
@@ -379,18 +404,6 @@ func _render_shop_controls() -> void:
 		reward_button.text = "%s - %s" % [card.get("name", card_id), GameDatabase.get_class_name(card.get("class_id", ""))]
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
 		safe_panel.add_child(reward_button)
-
-	var level_title = Label.new()
-	level_title.text = "Compra livello: %d anime" % run_state.next_level_cost()
-	safe_panel.add_child(level_title)
-
-	for card_id in run_state.collection:
-		var card = GameDatabase.get_card(card_id)
-		var level_button = Button.new()
-		level_button.text = "Potenzia %s a +%d" % [card.get("name", card_id), run_state.get_card_level(card_id) + 1]
-		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
-		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
-		safe_panel.add_child(level_button)
 
 	if run_state.has_shadow():
 		var shadow_title = Label.new()
@@ -408,16 +421,50 @@ func _render_shop_controls() -> void:
 			shadow_button.disabled = true
 		safe_panel.add_child(shadow_button)
 
-	var next_button = Button.new()
-	next_button.text = "Nuovo combattimento"
-	next_button.disabled = run_state.can_start_forced_shadow_encounter() or not combat_state.rewards_claimed
-	next_button.pressed.connect(_on_new_combat_pressed)
-	safe_panel.add_child(next_button)
+	_render_map_controls()
 
 	var menu_button = Button.new()
 	menu_button.text = "Torna al menu"
 	menu_button.pressed.connect(_on_menu_pressed)
 	safe_panel.add_child(menu_button)
+
+
+func _render_level_shop_controls() -> void:
+	var level_title = Label.new()
+	level_title.text = "Acquista livello: %d anime" % run_state.next_level_cost()
+	safe_panel.add_child(level_title)
+
+	var level_hint = Label.new()
+	level_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	level_hint.text = "Scegli una carta: sali di livello, ottieni +5 vita/stamina fino a 100 e quella carta prende +1."
+	safe_panel.add_child(level_hint)
+
+	for card_id in run_state.collection:
+		var card = GameDatabase.get_card(card_id)
+		var level_button = Button.new()
+		level_button.text = "Compra Lv + potenzia %s a +%d" % [card.get("name", card_id), run_state.get_card_level(card_id) + 1]
+		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
+		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
+		safe_panel.add_child(level_button)
+
+
+func _render_map_controls() -> void:
+	var map_title = Label.new()
+	map_title.text = "Movimento griglia"
+	safe_panel.add_child(map_title)
+
+	var directions = [
+		["Nord", "north"],
+		["Sud", "south"],
+		["Est", "east"],
+		["Ovest", "west"],
+	]
+	for direction in directions:
+		var move_button = Button.new()
+		move_button.text = "Vai a %s" % direction[0]
+		move_button.disabled = run_state.game_won or run_state.can_start_forced_shadow_encounter() or not combat_state.rewards_claimed
+		move_button.pressed.connect(_on_move_pressed.bind(direction[1]))
+		safe_panel.add_child(move_button)
 
 
 func _on_card_pressed(card_id: String) -> void:
@@ -447,6 +494,8 @@ func _on_end_intent_pressed() -> void:
 func _on_claim_rewards_pressed() -> void:
 	var result = combat_state.claim_enemy_rewards()
 	_push_log(result.get("message", ""))
+	if run_state.game_won:
+		_push_log("Hai sconfitto il boss finale della tua classe. La run e completa.")
 	_refresh_ui()
 
 
@@ -479,6 +528,13 @@ func _on_new_combat_pressed() -> void:
 	_refresh_ui()
 
 
+func _on_move_pressed(direction: String) -> void:
+	var node = run_state.move_to_direction(direction)
+	_push_log("Ti muovi verso %s: %s." % [direction, node.get("name", "nodo sconosciuto")])
+	_enter_current_map_node()
+	_refresh_ui()
+
+
 func _on_shadow_boss_pressed(second_encounter: bool) -> void:
 	_start_shadow_combat(second_encounter)
 	_refresh_ui()
@@ -495,7 +551,8 @@ func _on_restart_run_pressed() -> void:
 	run_state.start_new_run(true)
 	has_current_run = true
 	defeat_snapshot_saved = false
-	_start_new_combat()
+	screen_mode = SCREEN_SAFE
+	_prepare_safe_node_state()
 	_push_log("Nuova run. Da qualche parte, l'Ombra custodisce cio che hai perso.")
 	_refresh_ui()
 
@@ -507,6 +564,54 @@ func _on_menu_pressed() -> void:
 
 func _enter_safe_area() -> void:
 	screen_mode = SCREEN_SAFE
+
+
+func _enter_current_map_node() -> void:
+	var node_type = run_state.get_current_node_type()
+	if node_type == "event":
+		_resolve_event_node()
+		return
+	if node_type == "campfire":
+		run_state.mark_current_node_resolved()
+		_prepare_safe_node_state()
+		screen_mode = SCREEN_SAFE
+		_push_log("Raggiungi un falò. Puoi riprendere fiato.")
+		return
+	_start_new_combat()
+
+
+func _resolve_event_node() -> void:
+	var reward = 20 + run_state.get_distance_from_start() * 3
+	run_state.add_material("anime", reward)
+	run_state.add_fear(5)
+	run_state.mark_current_node_resolved()
+	combat_state.ended = true
+	combat_state.victory = true
+	combat_state.rewards_claimed = true
+	combat_state.enemy = {
+		"name": run_state.get_current_node_name(),
+		"health": 0,
+		"max_health": 0,
+		"poison": 0,
+		"burn": 0,
+		"intents": [],
+	}
+	screen_mode = SCREEN_SAFE
+	_push_log("Evento oscuro: ottieni %d anime, ma la paura sale a %d." % [reward, run_state.fear])
+
+
+func _prepare_safe_node_state() -> void:
+	combat_state.ended = true
+	combat_state.victory = true
+	combat_state.rewards_claimed = true
+	combat_state.enemy = {
+		"name": run_state.get_current_node_name(),
+		"health": 0,
+		"max_health": 0,
+		"poison": 0,
+		"burn": 0,
+		"intents": [],
+	}
 
 
 func _save_shadow_after_defeat() -> void:
