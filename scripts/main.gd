@@ -214,6 +214,7 @@ func _render_start_menu() -> void:
 
 
 func _render_menu_buttons() -> void:
+	card_grid.columns = 1
 	for child in card_grid.get_children():
 		child.queue_free()
 
@@ -253,6 +254,7 @@ func _render_menu_panel() -> void:
 
 
 func _render_cards() -> void:
+	card_grid.columns = 4
 	for child in card_grid.get_children():
 		child.queue_free()
 
@@ -276,15 +278,20 @@ func _render_cards() -> void:
 
 
 func _render_safe_summary() -> void:
+	card_grid.columns = 1
 	for child in card_grid.get_children():
 		child.queue_free()
 
 	var summary = Label.new()
+	summary.custom_minimum_size = Vector2(620, 0)
+	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	summary.text = "Riposa, spendi anime, scegli una carta o prosegui verso il prossimo combattimento."
 	card_grid.add_child(summary)
 
 	var stats = Label.new()
+	stats.custom_minimum_size = Vector2(620, 0)
+	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	stats.text = "Collezione: %d/%d | Loadout: %d/%d | Potenziamenti Ombra: %d" % [
 		run_state.collection.size(),
