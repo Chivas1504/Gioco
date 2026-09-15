@@ -12,8 +12,10 @@ Prototipo Godot 4 per un roguelike deckbuilding 2D senza pesca, con carte sempre
 - Le carte usate tornano disponibili dopo la risoluzione dell'intento nemico.
 - Collezione massima: 40 carte.
 - Loadout: minimo 4, massimo 12 carte.
+- Al Falò / Shop puoi aprire una vista per controllare collezione e loadout attuale.
 - Consumabili previsti: massimo 4.
 - Acquisire la prima carta di classe assegna quella classe se sei ancora Senzaclasse.
+- Classi presenti: Guerriero, Elfo, Mago, Vampiro, Lupo Mannaro, Non morto, Fantasma, Chierico, Necromante, Cacciatore di Mostri, Ladro e Djin nascosto.
 - Le carte fuori classe costano stamina extra in base alla rarita.
 - Il level up si compra con anime, aumenta vita e stamina di +5 fino a 100 e potenzia una carta di +1.
 - La stessa carta puo essere potenziata infinite volte, un livello alla volta.

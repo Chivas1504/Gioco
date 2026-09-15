@@ -8,9 +8,16 @@ const MIN_WINDOW_SIZE = Vector2i(960, 540)
 
 const REWARD_POOL = [
 	"warrior_clean_slash",
-	"ranger_quick_shot",
+	"elf_quick_shot",
 	"mage_occult_dart",
 	"vampire_crimson_bite",
+	"werewolf_moon_rend",
+	"undead_bone_guard",
+	"ghost_phase_touch",
+	"cleric_blessed_mace",
+	"necromancer_grave_pact",
+	"monster_hunter_silver_cut",
+	"thief_backstab",
 ]
 
 var run_state = RunState.new()
@@ -18,6 +25,7 @@ var combat_state = CombatState.new()
 var log_lines: Array = []
 var screen_mode = SCREEN_MENU
 var has_current_run = false
+var show_collection_view = false
 
 var screen_title: Label
 var fullscreen_button: Button
@@ -191,6 +199,7 @@ func _show_start_menu() -> void:
 func _start_new_run_from_menu() -> void:
 	run_state.start_new_run(true)
 	has_current_run = true
+	show_collection_view = false
 	log_lines = []
 	screen_mode = SCREEN_SAFE
 	_prepare_safe_node_state()
@@ -367,6 +376,10 @@ func _render_safe_summary() -> void:
 	for child in card_grid.get_children():
 		child.queue_free()
 
+	if show_collection_view:
+		_render_collection_summary()
+		return
+
 	var summary = Label.new()
 	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -401,6 +414,77 @@ func _render_safe_summary() -> void:
 		var upgrade = Label.new()
 		upgrade.text = GameDatabase.get_shadow_upgrade_name(upgrade_id)
 		card_grid.add_child(upgrade)
+
+
+func _render_collection_summary() -> void:
+	var title = Label.new()
+	title.text = "Collezione e loadout"
+	title.add_theme_font_size_override("font_size", 18)
+	card_grid.add_child(title)
+
+	var counts = Label.new()
+	counts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	counts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	counts.text = "Loadout: %d/%d | Collezione: %d/%d" % [
+		run_state.loadout.size(),
+		CardRules.LOADOUT_MAX,
+		run_state.collection.size(),
+		CardRules.COLLECTION_MAX,
+	]
+	card_grid.add_child(counts)
+
+	var class_names = []
+	for class_id in run_state.acquired_classes:
+		class_names.append(GameDatabase.get_class_name(class_id))
+	var classes = Label.new()
+	classes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	classes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	classes.text = "Classi acquisite: %s" % (", ".join(class_names) if not class_names.is_empty() else "nessuna")
+	card_grid.add_child(classes)
+
+	_add_collection_section("Loadout attuale", run_state.loadout)
+
+	var reserve_cards = []
+	for card_id in run_state.collection:
+		if not run_state.loadout.has(card_id):
+			reserve_cards.append(card_id)
+	_add_collection_section("In collezione, fuori loadout", reserve_cards)
+
+
+func _add_collection_section(title_text: String, card_ids: Array) -> void:
+	var title = Label.new()
+	title.text = title_text
+	title.add_theme_font_size_override("font_size", 16)
+	card_grid.add_child(title)
+
+	if card_ids.is_empty():
+		var empty = Label.new()
+		empty.text = "Nessuna carta."
+		card_grid.add_child(empty)
+		return
+
+	for card_id in card_ids:
+		var card = GameDatabase.get_card(card_id)
+		var card_label = Label.new()
+		card_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if card.is_empty():
+			card_label.text = "%s | carta non trovata" % card_id
+			card_grid.add_child(card_label)
+			continue
+		var level = run_state.get_card_level(card_id)
+		var level_text = " +%d" % level if level > 0 else ""
+		var class_id = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+		var cost = GameDatabase.get_base_stamina_cost(card, run_state.active_class)
+		card_label.text = "%s%s | %s | %s | costo attuale %d\n%s" % [
+			card.get("name", card_id),
+			level_text,
+			GameDatabase.get_class_name(class_id),
+			_rarity_label(card.get("rarity", "")),
+			cost,
+			card.get("effect_text", ""),
+		]
+		card_grid.add_child(card_label)
 
 
 func _render_safe_panel() -> void:
@@ -461,6 +545,11 @@ func _render_shop_controls() -> void:
 		claim_button.text = "Raccogli anime"
 		claim_button.pressed.connect(_on_claim_rewards_pressed)
 		safe_panel.add_child(claim_button)
+
+	var collection_button = Button.new()
+	collection_button.text = "Nascondi collezione / loadout" if show_collection_view else "Vedi collezione / loadout"
+	collection_button.pressed.connect(_on_toggle_collection_view_pressed)
+	safe_panel.add_child(collection_button)
 
 	_render_level_shop_controls()
 
@@ -631,6 +720,11 @@ func _on_restart_run_pressed() -> void:
 
 func _on_menu_pressed() -> void:
 	_show_start_menu()
+	_refresh_ui()
+
+
+func _on_toggle_collection_view_pressed() -> void:
+	show_collection_view = not show_collection_view
 	_refresh_ui()
 
 

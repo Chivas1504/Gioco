@@ -3,9 +3,17 @@ extends RefCounted
 
 const CLASS_NEUTRAL = "neutral"
 const CLASS_WARRIOR = "warrior"
-const CLASS_RANGER = "ranger"
+const CLASS_ELF = "elf"
 const CLASS_MAGE = "mage"
 const CLASS_VAMPIRE = "vampire"
+const CLASS_WEREWOLF = "werewolf"
+const CLASS_UNDEAD = "undead"
+const CLASS_GHOST = "ghost"
+const CLASS_CLERIC = "cleric"
+const CLASS_NECROMANCER = "necromancer"
+const CLASS_MONSTER_HUNTER = "monster_hunter"
+const CLASS_THIEF = "thief"
+const CLASS_DJIN = "djin"
 
 const RARITY_COMMON = "common"
 const RARITY_UNCOMMON = "uncommon"

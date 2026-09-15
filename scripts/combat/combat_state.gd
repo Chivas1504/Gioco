@@ -182,6 +182,11 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 		guard += guard_gain
 		messages.append("Ottieni %d guardia." % guard_gain)
 
+	if effects.has("weaken_next_intent"):
+		var weaken = int(effects.get("weaken_next_intent", 0))
+		weakened_next_intent += weaken
+		messages.append("Il prossimo intento offensivo perde %d danni." % weaken)
+
 	if effects.has("dodge_multiplier"):
 		next_damage_multiplier = min(next_damage_multiplier, float(effects.get("dodge_multiplier", 1.0)))
 		if next_damage_multiplier <= 0.0:
@@ -209,7 +214,7 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 	if card.get("class_id") == CardRules.CLASS_MAGE and next_mage_damage_bonus > 0 and damage > 0:
 		damage += next_mage_damage_bonus
 		next_mage_damage_bonus = 0
-	if card.get("class_id") == CardRules.CLASS_RANGER and bool(enemy.get("marked", false)):
+	if card.get("class_id") == CardRules.CLASS_ELF and bool(enemy.get("marked", false)):
 		damage += 2
 
 	var blood_spent = 0
@@ -226,16 +231,16 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 		enemy["health"] = max(0, int(enemy.get("health", 0)) - damage)
 		messages.append("Infliggi %d danni." % damage)
 
-	var applies_ranger_bonus = (
-		run_state.active_class == CardRules.CLASS_RANGER
-		and card.get("class_id") == CardRules.CLASS_RANGER
-		and not used_class_bonuses.has(CardRules.CLASS_RANGER)
+	var applies_elf_bonus = (
+		run_state.active_class == CardRules.CLASS_ELF
+		and card.get("class_id") == CardRules.CLASS_ELF
+		and not used_class_bonuses.has(CardRules.CLASS_ELF)
 	)
-	if effects.has("poison") or applies_ranger_bonus:
+	if effects.has("poison") or applies_elf_bonus:
 		var poison = int(effects.get("poison", 0)) + level * int(effects.get("poison_per_level", 0))
-		if applies_ranger_bonus:
+		if applies_elf_bonus:
 			poison += 1
-			used_class_bonuses.append(CardRules.CLASS_RANGER)
+			used_class_bonuses.append(CardRules.CLASS_ELF)
 		enemy["poison"] = int(enemy.get("poison", 0)) + poison
 		messages.append("Applichi %d veleno." % poison)
 
