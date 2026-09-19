@@ -15,7 +15,8 @@ const CARD_WIDTH = 190
 const CARD_HEIGHT = 260
 const SHOP_CARD_WIDTH = 150
 const SHOP_CARD_HEIGHT = 205
-const SHOP_CONSUMABLE_SLOT_SIZE = 70
+const SHOP_CONSUMABLE_SLOT_WIDTH = 150
+const SHOP_CONSUMABLE_SLOT_HEIGHT = 92
 const CARD_GRID_COLUMNS = 3
 const HAND_CARD_WIDTH = 118
 const HAND_CARD_HEIGHT = 170
@@ -719,10 +720,9 @@ func _add_unified_shop_cards(parent: Control) -> void:
 		var card_button = Button.new()
 		card_button.custom_minimum_size = Vector2(SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT)
 		card_button.size = Vector2(SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT)
-		card_button.text = _get_card_display_text(card_id, "%d anime" % cost, "Compra")
 		card_button.disabled = run_state.get_material("anime") < cost or run_state.collection.size() >= CardRules.COLLECTION_MAX
 		_apply_card_button_style(card_button, card)
-		card_button.add_theme_font_size_override("font_size", 12)
+		_add_fixed_card_label(card_button, _get_card_display_text(card_id, "%d anime" % cost, "Compra"), Color(0.92, 0.90, 0.86), 12)
 		card_button.pressed.connect(_on_shop_card_buy_pressed.bind(card_id))
 		grid.add_child(card_button)
 
@@ -791,16 +791,17 @@ func _add_unified_consumables(parent: VBoxContainer) -> void:
 
 	var grid = GridContainer.new()
 	grid.columns = 4
-	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	grid.add_theme_constant_override("h_separation", 16)
-	grid.add_theme_constant_override("v_separation", 16)
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 18)
 	consumable_area.add_child(grid)
 
 	for index in range(12):
 		var slot = PanelContainer.new()
-		slot.custom_minimum_size = Vector2(SHOP_CONSUMABLE_SLOT_SIZE, SHOP_CONSUMABLE_SLOT_SIZE)
-		slot.size = Vector2(SHOP_CONSUMABLE_SLOT_SIZE, SHOP_CONSUMABLE_SLOT_SIZE)
+		slot.custom_minimum_size = Vector2(SHOP_CONSUMABLE_SLOT_WIDTH, SHOP_CONSUMABLE_SLOT_HEIGHT)
+		slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		slot.tooltip_text = "Slot consumabile %d" % (index + 1)
 		slot.add_theme_stylebox_override("panel", _make_consumable_slot_style())
 		grid.add_child(slot)
@@ -1270,6 +1271,10 @@ func _apply_enemy_stack_panel_style(panel: Panel) -> void:
 
 
 func _add_stack_card_label(panel: Panel, text: String, color: Color) -> void:
+	_add_fixed_card_label(panel, text, color, 14)
+
+
+func _add_fixed_card_label(parent: Control, text: String, color: Color, font_size: int) -> void:
 	var label = Label.new()
 	label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	label.offset_left = 8
@@ -1281,9 +1286,10 @@ func _add_stack_card_label(panel: Panel, text: String, color: Color) -> void:
 	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.clip_text = true
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_font_size_override("font_size", 14)
-	panel.add_child(label)
+	label.add_theme_font_size_override("font_size", font_size)
+	parent.add_child(label)
 
 
 func _make_enemy_stack_card_style(shade: float, border_width: int) -> StyleBoxFlat:
