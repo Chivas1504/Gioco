@@ -4,6 +4,7 @@ extends RefCounted
 var run_state: RunState
 var enemy = {}
 var used_card_ids: Array = []
+var staged_card_ids: Array = []
 var used_class_bonuses: Array = []
 var guard = 0
 var enemy_strength_bonus = 0
@@ -24,6 +25,7 @@ func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
 	enemy = p_enemy.duplicate(true)
 	used_card_ids = []
+	staged_card_ids = []
 	used_class_bonuses = []
 	guard = 0
 	enemy_strength_bonus = 0
@@ -95,9 +97,79 @@ func play_card(card_id: String) -> Dictionary:
 	return {"ok": true, "message": " ".join(messages)}
 
 
+func stage_card(card_id: String) -> Dictionary:
+	if not can_play_card(card_id):
+		return {"ok": false, "message": "Non puoi impilare questa carta ora."}
+
+	var card = GameDatabase.get_card(card_id)
+	var cost = get_card_cost_for_current_intent(card_id)
+	var used_sorcerer_bonus = _will_use_sorcerer_bonus(card)
+	run_state.stamina -= cost
+	stamina_spent_this_round += cost
+	used_card_ids.append(card_id)
+	staged_card_ids.append(card_id)
+	if used_sorcerer_bonus:
+		used_class_bonuses.append(CardRules.CLASS_SORCERER)
+	return {
+		"ok": true,
+		"message": "Impili %s. Stamina -%d." % [card.get("name", card_id), cost],
+	}
+
+
+func has_staged_cards() -> bool:
+	return not staged_card_ids.is_empty()
+
+
+func get_staged_card_count() -> int:
+	return staged_card_ids.size()
+
+
+func get_staged_card_names() -> Array:
+	var names: Array = []
+	for card_id in staged_card_ids:
+		var card = GameDatabase.get_card(String(card_id))
+		names.append(String(card.get("name", card_id)))
+	return names
+
+
+func resolve_staged_cards() -> Dictionary:
+	if ended:
+		return {"ok": false, "message": "Il combattimento e gia finito."}
+	if staged_card_ids.is_empty():
+		return {"ok": false, "message": "Non hai carte nella pila."}
+
+	var stack = staged_card_ids.duplicate()
+	staged_card_ids = []
+	var messages = ["Risolvi la pila dal basso verso l'alto."]
+	var damage_pool = {
+		"damage": 0,
+		"recover_stamina_on_kill": 0,
+		"gain_blood_on_kill": 0,
+	}
+	var killed_before = int(enemy.get("health", 0)) <= 0
+	for card_id in stack:
+		var card = GameDatabase.get_card(String(card_id))
+		if card.is_empty():
+			continue
+		var level = run_state.get_card_level(String(card_id))
+		var trigger_count = _get_card_trigger_count(card)
+		for trigger_index in range(trigger_count):
+			if trigger_index > 0:
+				messages.append("%s si riattiva." % card.get("name", card_id))
+			else:
+				messages.append("%s si risolve." % card.get("name", card_id))
+			messages.append_array(_apply_card_effects(card, level, damage_pool))
+
+	_apply_damage_pool(damage_pool, killed_before, messages)
+	_check_end_state()
+	return {"ok": true, "message": " ".join(messages)}
+
+
 func resolve_enemy_intent() -> Dictionary:
 	if ended:
 		return {"ok": false, "message": "Il combattimento e gia finito."}
+	if has_staged_cards():
+		return {"ok": false, "message": "Prima devi risolvere la pila di carte."}
 
 	var messages = []
 	var intent = current_intent()
@@ -178,7 +250,7 @@ func _get_enemy_reward_souls() -> int:
 	return souls
 
 
-func _apply_card_effects(card: Dictionary, level: int) -> Array:
+func _apply_card_effects(card: Dictionary, level: int, damage_pool = null) -> Array:
 	var effects = card.get("effects", {})
 	var messages: Array = []
 	var killed_before = enemy.get("health", 0) <= 0
@@ -257,13 +329,20 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 			run_state.health = min(run_state.max_health, run_state.health + heal)
 			messages.append("Spendi %d sangue e recuperi %d vita." % [blood_spent, heal])
 
-	if damage > 0:
+	if damage > 0 and damage_pool == null:
 		enemy["health"] = max(0, int(enemy.get("health", 0)) - damage)
 		messages.append("Infliggi %d danni." % damage)
 		if run_state.active_class == CardRules.CLASS_WEREWOLF:
 			enemy["bleed"] = int(enemy.get("bleed", 0)) + damage
 			run_state.add_material("sangue", damage)
 			messages.append("Il Lupo Mannaro strappa %d sangue." % damage)
+	elif damage > 0:
+		damage_pool["damage"] = int(damage_pool.get("damage", 0)) + damage
+		messages.append("Prepari %d danni." % damage)
+		if effects.has("recover_stamina_on_kill"):
+			damage_pool["recover_stamina_on_kill"] = int(damage_pool.get("recover_stamina_on_kill", 0)) + int(effects.get("recover_stamina_on_kill", 0))
+		if effects.has("gain_blood_on_kill"):
+			damage_pool["gain_blood_on_kill"] = int(damage_pool.get("gain_blood_on_kill", 0)) + int(effects.get("gain_blood_on_kill", 0))
 
 	var applies_elf_bonus = (
 		run_state.active_class == CardRules.CLASS_ELF
@@ -298,7 +377,7 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 		run_state.add_material("sangue", int(effects.get("gain_blood", 0)))
 		messages.append("Guadagni %d sangue." % int(effects.get("gain_blood", 0)))
 
-	if not killed_before and enemy.get("health", 0) <= 0:
+	if damage_pool == null and not killed_before and enemy.get("health", 0) <= 0:
 		if effects.has("recover_stamina_on_kill"):
 			var stamina_on_kill = int(effects.get("recover_stamina_on_kill", 0))
 			run_state.stamina = min(run_state.max_stamina, run_state.stamina + stamina_on_kill)
@@ -312,6 +391,37 @@ func _apply_card_effects(card: Dictionary, level: int) -> Array:
 			messages.append("Il bonus Vampiro ti restituisce sangue e vita.")
 
 	return messages
+
+
+func _apply_damage_pool(damage_pool: Dictionary, killed_before: bool, messages: Array) -> void:
+	var total_damage = int(damage_pool.get("damage", 0))
+	if total_damage <= 0:
+		return
+
+	enemy["health"] = max(0, int(enemy.get("health", 0)) - total_damage)
+	messages.append("La pila infligge %d danni in un unico colpo." % total_damage)
+	if run_state.active_class == CardRules.CLASS_WEREWOLF:
+		enemy["bleed"] = int(enemy.get("bleed", 0)) + total_damage
+		run_state.add_material("sangue", total_damage)
+		messages.append("Il Lupo Mannaro strappa %d sangue." % total_damage)
+
+	if killed_before or int(enemy.get("health", 0)) > 0:
+		return
+
+	var stamina_on_kill = int(damage_pool.get("recover_stamina_on_kill", 0))
+	if stamina_on_kill > 0:
+		run_state.stamina = min(run_state.max_stamina, run_state.stamina + stamina_on_kill)
+		messages.append("Recuperi %d stamina." % stamina_on_kill)
+
+	var blood_on_kill = int(damage_pool.get("gain_blood_on_kill", 0))
+	if blood_on_kill > 0:
+		run_state.add_material("sangue", blood_on_kill)
+		messages.append("Guadagni sangue dal colpo finale.")
+
+	if run_state.active_class == CardRules.CLASS_VAMPIRE:
+		run_state.add_material("sangue", 1)
+		run_state.health = min(run_state.max_health, run_state.health + 2)
+		messages.append("Il bonus Vampiro ti restituisce sangue e vita.")
 
 
 func _apply_end_of_intent_status(messages: Array) -> void:
@@ -375,6 +485,7 @@ func _apply_end_of_round_class_effects(messages: Array) -> void:
 
 func _reset_intent_state() -> void:
 	used_card_ids = []
+	staged_card_ids = []
 	used_class_bonuses = []
 	guard = 0
 	weakened_next_intent = 0
@@ -383,12 +494,12 @@ func _reset_intent_state() -> void:
 
 
 func _check_end_state() -> void:
-	if run_state.health <= 0 or run_state.stamina <= 0:
-		ended = true
-		victory = false
-	elif enemy.get("health", 0) <= 0:
+	if enemy.get("health", 0) <= 0:
 		ended = true
 		victory = true
+	elif run_state.health <= 0 or run_state.stamina <= 0:
+		ended = true
+		victory = false
 
 
 func _get_card_trigger_count(card: Dictionary) -> int:

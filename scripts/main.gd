@@ -304,6 +304,8 @@ func _refresh_ui() -> void:
 			intent_label.text = "Intento: %s, +%d forza" % [intent.get("name", ""), intent.get("strength", 0)]
 		else:
 			intent_label.text = "Intento: -"
+		if combat_state.has_staged_cards():
+			intent_label.text += "\nPila: %s" % _format_staged_stack()
 
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
@@ -325,9 +327,15 @@ func _refresh_ui() -> void:
 		screen_title.text = "Combattimento"
 		hand_spacer.visible = true
 		end_intent_button.visible = true
+		end_intent_button.disabled = combat_state.ended
+		if combat_state.has_staged_cards():
+			end_intent_button.text = "Risolvi pila (%d)" % combat_state.get_staged_card_count()
+		else:
+			end_intent_button.text = "Risolvi intento nemico"
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
+		_render_combat_stack_area()
 		_render_cards()
 	_render_safe_panel()
 	log_label.text = "\n".join(log_lines) if log_label.visible else ""
@@ -411,6 +419,40 @@ func _render_cards() -> void:
 		button.mouse_exited.connect(_on_hand_card_mouse_exited.bind(button))
 		button.pressed.connect(_on_card_pressed.bind(card_id))
 		card_grid.add_child(button)
+
+
+func _render_combat_stack_area() -> void:
+	for child in hand_spacer.get_children():
+		child.queue_free()
+	if screen_mode != SCREEN_COMBAT or not combat_state.has_staged_cards():
+		return
+
+	var center = CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hand_spacer.add_child(center)
+
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(380, 140)
+	center.add_child(panel)
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.alignment = BoxContainer.ALIGNMENT_CENTER
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+
+	var title = Label.new()
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.text = "Pila (%d)" % combat_state.get_staged_card_count()
+	title.add_theme_font_size_override("font_size", 18)
+	content.add_child(title)
+
+	var stack_text = Label.new()
+	stack_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stack_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stack_text.text = _format_staged_stack()
+	content.add_child(stack_text)
 
 
 func _render_safe_summary() -> void:
@@ -815,6 +857,16 @@ func _get_hand_card_display_text(card_id: String, cost: int) -> String:
 		_rarity_label(card.get("rarity", "")),
 		cost,
 	]
+
+
+func _format_staged_stack() -> String:
+	var names = combat_state.get_staged_card_names()
+	var text = ""
+	for index in range(names.size()):
+		if index > 0:
+			text += " > "
+		text += String(names[index])
+	return text
 
 
 func _format_card_button_effect(effect_text: String) -> String:
@@ -1252,19 +1304,17 @@ func _render_map_controls() -> void:
 
 
 func _on_card_pressed(card_id: String) -> void:
-	var result = combat_state.play_card(card_id)
+	var result = combat_state.stage_card(card_id)
 	_push_log(result.get("message", ""))
-	if combat_state.ended and combat_state.victory:
-		_push_log("Il nemico cade. Le carte torneranno disponibili nel prossimo combattimento.")
-		_enter_reward_area()
-	elif combat_state.ended:
-		_save_shadow_after_defeat()
-		_push_log("La run finisce qui.")
 	_refresh_ui()
 
 
 func _on_end_intent_pressed() -> void:
-	var result = combat_state.resolve_enemy_intent()
+	var result = {}
+	if combat_state.has_staged_cards():
+		result = combat_state.resolve_staged_cards()
+	else:
+		result = combat_state.resolve_enemy_intent()
 	_push_log(result.get("message", ""))
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade.")
