@@ -124,6 +124,10 @@ func get_staged_card_count() -> int:
 	return staged_card_ids.size()
 
 
+func get_staged_card_ids() -> Array:
+	return staged_card_ids.duplicate()
+
+
 func get_staged_card_names() -> Array:
 	var names: Array = []
 	for card_id in staged_card_ids:

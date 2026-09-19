@@ -17,6 +17,7 @@ const HAND_CARD_WIDTH = 118
 const HAND_CARD_HEIGHT = 170
 const HAND_CARD_COLUMNS = 12
 const HAND_CARD_ZOOM = 1.12
+const STACK_CARD_OFFSET = Vector2(22, 16)
 
 var run_state = RunState.new()
 var combat_state = CombatState.new()
@@ -431,28 +432,27 @@ func _render_combat_stack_area() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hand_spacer.add_child(center)
 
-	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(380, 140)
-	center.add_child(panel)
+	var staged_cards = combat_state.get_staged_card_ids()
+	var stack_board = Control.new()
+	stack_board.custom_minimum_size = Vector2(
+		CARD_WIDTH + STACK_CARD_OFFSET.x * max(0, staged_cards.size() - 1),
+		CARD_HEIGHT + STACK_CARD_OFFSET.y * max(0, staged_cards.size() - 1)
+	)
+	center.add_child(stack_board)
 
-	var content = VBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 8)
-	panel.add_child(content)
-
-	var title = Label.new()
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.text = "Pila (%d)" % combat_state.get_staged_card_count()
-	title.add_theme_font_size_override("font_size", 18)
-	content.add_child(title)
-
-	var stack_text = Label.new()
-	stack_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stack_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	stack_text.text = _format_staged_stack()
-	content.add_child(stack_text)
+	for index in range(staged_cards.size()):
+		var card_id = String(staged_cards[index])
+		var card = GameDatabase.get_card(card_id)
+		var stack_card = Button.new()
+		stack_card.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		stack_card.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		stack_card.position = STACK_CARD_OFFSET * index
+		stack_card.z_index = index
+		stack_card.focus_mode = Control.FOCUS_NONE
+		stack_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stack_card.text = _get_card_display_text(card_id, "in pila", "Pronta")
+		_apply_card_button_style(stack_card, card)
+		stack_board.add_child(stack_card)
 
 
 func _render_safe_summary() -> void:
