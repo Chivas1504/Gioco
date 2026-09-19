@@ -136,11 +136,6 @@ func _build_ui() -> void:
 	card_grid.add_theme_constant_override("v_separation", 10)
 	left_column.add_child(card_grid)
 
-	end_intent_button = Button.new()
-	end_intent_button.text = "Risolvi intento nemico"
-	end_intent_button.pressed.connect(_on_end_intent_pressed)
-	left_column.add_child(end_intent_button)
-
 	action_scroll = ScrollContainer.new()
 	action_scroll.custom_minimum_size = Vector2(300, 0)
 	action_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -281,7 +276,6 @@ func _refresh_ui() -> void:
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
 		cards_title.visible = false
-		end_intent_button.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
 		_render_safe_summary()
@@ -289,7 +283,6 @@ func _refresh_ui() -> void:
 		screen_title.text = "Combattimento"
 		cards_title.visible = true
 		cards_title.text = "Carte build disponibili"
-		end_intent_button.visible = true
 		action_scroll.visible = true
 		log_label.visible = true
 		_render_cards()
@@ -304,7 +297,6 @@ func _render_start_menu() -> void:
 	intent_label.text = ""
 	cards_title.visible = true
 	cards_title.text = "Menu"
-	end_intent_button.visible = false
 	_render_menu_buttons()
 	_render_menu_panel()
 
@@ -920,6 +912,12 @@ func _render_safe_panel() -> void:
 	safe_panel.add_child(title)
 
 	if not combat_state.ended:
+		end_intent_button = Button.new()
+		end_intent_button.text = "Risolvi intento nemico"
+		end_intent_button.custom_minimum_size = Vector2(240, 48)
+		end_intent_button.pressed.connect(_on_end_intent_pressed)
+		safe_panel.add_child(end_intent_button)
+
 		var hint = Label.new()
 		hint.text = "Il Falò/Shop si apre dopo la vittoria."
 		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
