@@ -15,7 +15,7 @@ const CARD_HEIGHT = 260
 const CARD_GRID_COLUMNS = 3
 const HAND_CARD_WIDTH = 118
 const HAND_CARD_HEIGHT = 170
-const HAND_CARD_COLUMNS = 6
+const HAND_CARD_COLUMNS = 12
 const HAND_CARD_ZOOM = 1.12
 
 var run_state = RunState.new()
@@ -140,6 +140,14 @@ func _build_ui() -> void:
 	hand_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left_column.add_child(hand_spacer)
 
+	end_intent_button = Button.new()
+	end_intent_button.text = "Risolvi intento nemico"
+	end_intent_button.custom_minimum_size = Vector2(260, 52)
+	end_intent_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	end_intent_button.visible = false
+	end_intent_button.pressed.connect(_on_end_intent_pressed)
+	left_column.add_child(end_intent_button)
+
 	card_grid = GridContainer.new()
 	card_grid.columns = 4
 	card_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -252,6 +260,7 @@ func _refresh_ui() -> void:
 	_clear_card_preview()
 	if screen_mode == SCREEN_MENU:
 		hand_spacer.visible = false
+		end_intent_button.visible = false
 		log_label.visible = true
 		action_scroll.visible = true
 		_render_start_menu()
@@ -299,6 +308,7 @@ func _refresh_ui() -> void:
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
 		hand_spacer.visible = false
+		end_intent_button.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
@@ -306,6 +316,7 @@ func _refresh_ui() -> void:
 	elif screen_mode == SCREEN_REWARD:
 		screen_title.text = "Ricompensa"
 		hand_spacer.visible = false
+		end_intent_button.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
@@ -313,10 +324,10 @@ func _refresh_ui() -> void:
 	else:
 		screen_title.text = "Combattimento"
 		hand_spacer.visible = true
-		cards_title.visible = true
-		cards_title.text = "Mano"
-		action_scroll.visible = true
-		log_label.visible = true
+		end_intent_button.visible = true
+		cards_title.visible = false
+		action_scroll.visible = false
+		log_label.visible = false
 		_render_cards()
 	_render_safe_panel()
 	log_label.text = "\n".join(log_lines) if log_label.visible else ""
@@ -328,6 +339,7 @@ func _render_start_menu() -> void:
 	enemy_label.text = ""
 	intent_label.text = ""
 	cards_title.visible = true
+	end_intent_button.visible = false
 	cards_title.text = "Menu"
 	_render_menu_buttons()
 	_render_menu_panel()
@@ -1148,16 +1160,6 @@ func _render_safe_panel() -> void:
 	safe_panel.add_child(title)
 
 	if not combat_state.ended:
-		end_intent_button = Button.new()
-		end_intent_button.text = "Risolvi intento nemico"
-		end_intent_button.custom_minimum_size = Vector2(240, 48)
-		end_intent_button.pressed.connect(_on_end_intent_pressed)
-		safe_panel.add_child(end_intent_button)
-
-		var hint = Label.new()
-		hint.text = "Il Falò/Shop si apre dopo la vittoria."
-		hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		safe_panel.add_child(hint)
 		if bool(combat_state.enemy.get("is_shadow", false)):
 			var shadow_hint = Label.new()
 			if bool(combat_state.enemy.get("second_encounter", false)):
@@ -1485,7 +1487,7 @@ func _rarity_label(rarity: String) -> String:
 func _get_combat_card_columns() -> int:
 	var available_width = card_grid.size.x
 	if available_width < 240.0:
-		available_width = get_viewport_rect().size.x - action_scroll.custom_minimum_size.x - 96.0
+		available_width = get_viewport_rect().size.x - 96.0
 	var columns = floori(available_width / float(HAND_CARD_WIDTH + 12))
 	if columns < 1:
 		columns = 1
