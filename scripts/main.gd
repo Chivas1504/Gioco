@@ -245,6 +245,7 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 func _refresh_ui() -> void:
 	_refresh_fullscreen_button()
 	if screen_mode == SCREEN_MENU:
+		log_label.visible = true
 		action_scroll.visible = true
 		_render_start_menu()
 		log_label.text = "\n".join(log_lines)
@@ -290,6 +291,7 @@ func _refresh_ui() -> void:
 		cards_title.visible = false
 		end_intent_button.visible = false
 		action_scroll.visible = false
+		log_label.visible = false
 		_render_safe_summary()
 	else:
 		screen_title.text = "Combattimento"
@@ -297,9 +299,10 @@ func _refresh_ui() -> void:
 		cards_title.text = "Carte build disponibili"
 		end_intent_button.visible = true
 		action_scroll.visible = true
+		log_label.visible = true
 		_render_cards()
 	_render_safe_panel()
-	log_label.text = "\n".join(log_lines)
+	log_label.text = "\n".join(log_lines) if log_label.visible else ""
 
 
 func _render_start_menu() -> void:
@@ -542,28 +545,104 @@ func _add_collection_section(parent: VBoxContainer, title_text: String, card_ids
 		parent.add_child(empty)
 		return
 
+	var grid = GridContainer.new()
+	grid.columns = _get_collection_card_columns()
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	parent.add_child(grid)
+
 	for card_id in card_ids:
-		var card = GameDatabase.get_card(card_id)
-		var card_label = Label.new()
-		card_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		if card.is_empty():
-			card_label.text = "%s | carta non trovata" % card_id
-			parent.add_child(card_label)
-			continue
-		var level = run_state.get_card_level(card_id)
-		var level_text = " +%d" % level if level > 0 else ""
-		var class_id = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
-		var cost = GameDatabase.get_base_stamina_cost(card, run_state.active_class, run_state.collection)
-		card_label.text = "%s%s | %s | %s | costo attuale %d\n%s" % [
-			card.get("name", card_id),
-			level_text,
-			GameDatabase.get_class_name(class_id),
-			_rarity_label(card.get("rarity", "")),
-			cost,
-			card.get("effect_text", ""),
-		]
-		parent.add_child(card_label)
+		_add_collection_card(grid, card_id)
+
+
+func _add_collection_card(parent: Control, card_id: String) -> void:
+	var card = GameDatabase.get_card(card_id)
+	var panel = PanelContainer.new()
+	panel.custom_minimum_size = Vector2(190, 260)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(panel)
+
+	var rarity = String(card.get("rarity", "")) if not card.is_empty() else ""
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.105, 0.095, 0.085)
+	style.border_color = _rarity_color(rarity)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 10
+	style.content_margin_top = 10
+	style.content_margin_right = 10
+	style.content_margin_bottom = 10
+	panel.add_theme_stylebox_override("panel", style)
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 6)
+	panel.add_child(content)
+
+	if card.is_empty():
+		var missing = Label.new()
+		missing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		missing.text = "%s\nCarta non trovata" % card_id
+		content.add_child(missing)
+		return
+
+	var level = run_state.get_card_level(card_id)
+	var level_text = " +%d" % level if level > 0 else ""
+	var class_id = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	var cost = GameDatabase.get_base_stamina_cost(card, run_state.active_class, run_state.collection)
+
+	var name_label = Label.new()
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.text = "%s%s" % [card.get("name", card_id), level_text]
+	content.add_child(name_label)
+
+	var meta_label = Label.new()
+	meta_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	meta_label.text = "%s\n%s | costo %d" % [
+		GameDatabase.get_class_name(class_id),
+		_rarity_label(rarity),
+		cost,
+	]
+	content.add_child(meta_label)
+
+	var separator = HSeparator.new()
+	content.add_child(separator)
+
+	var effect_label = Label.new()
+	effect_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	effect_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	effect_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect_label.text = String(card.get("effect_text", ""))
+	content.add_child(effect_label)
+
+
+func _get_collection_card_columns() -> int:
+	var available_width = get_viewport_rect().size.x - 120.0
+	var columns = floori(available_width / 210.0)
+	if columns < 1:
+		columns = 1
+	if columns > 6:
+		columns = 6
+	return columns
+
+
+func _rarity_color(rarity: String) -> Color:
+	match rarity:
+		CardRules.RARITY_COMMON:
+			return Color(0.55, 0.55, 0.50)
+		CardRules.RARITY_UNCOMMON:
+			return Color(0.34, 0.64, 0.42)
+		CardRules.RARITY_RARE:
+			return Color(0.38, 0.50, 0.82)
+		CardRules.RARITY_LEGENDARY:
+			return Color(0.86, 0.62, 0.22)
+		_:
+			return Color(0.42, 0.38, 0.34)
 
 
 func _add_map_popup_content(parent: VBoxContainer) -> void:
