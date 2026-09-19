@@ -493,23 +493,22 @@ func _render_combat_stack_area() -> void:
 
 	for index in range(staged_cards.size()):
 		var entry: Dictionary = staged_cards[index]
-		var stack_card = Button.new()
+		var stack_card = Panel.new()
 		stack_card.custom_minimum_size = stack_card_size
 		stack_card.size = stack_card_size
 		stack_card.position = stack_offset * index
 		stack_card.z_index = index
-		stack_card.focus_mode = Control.FOCUS_NONE
 		stack_card.mouse_filter = Control.MOUSE_FILTER_STOP
 		if String(entry.get("owner", "")) == "enemy":
-			stack_card.text = _get_enemy_stack_card_display_text(entry, true)
 			stack_card.tooltip_text = _get_enemy_stack_card_display_text(entry, false)
-			_apply_enemy_stack_card_style(stack_card)
+			_apply_enemy_stack_panel_style(stack_card)
+			_add_stack_card_label(stack_card, _get_enemy_stack_card_display_text(entry, true), Color(0.94, 0.78, 0.72))
 		else:
 			var card_id = String(entry.get("card_id", ""))
 			var card = GameDatabase.get_card(card_id)
-			stack_card.text = _get_stack_player_card_display_text(card_id)
 			stack_card.tooltip_text = _get_card_display_text(card_id, "in pila", "Pronta")
-			_apply_card_button_style(stack_card, card)
+			_apply_card_panel_style(stack_card, card)
+			_add_stack_card_label(stack_card, _get_stack_player_card_display_text(card_id), Color(0.92, 0.90, 0.86))
 		stack_card.mouse_entered.connect(_on_stack_card_mouse_entered.bind(entry, stack_card))
 		stack_card.mouse_exited.connect(_on_stack_card_mouse_exited.bind(stack_card, index))
 		stack_board.add_child(stack_card)
@@ -1255,6 +1254,32 @@ func _apply_enemy_stack_card_style(button: Button) -> void:
 	button.add_theme_font_size_override("font_size", 14)
 
 
+func _apply_card_panel_style(panel: Panel, card: Dictionary) -> void:
+	var rarity = String(card.get("rarity", "")) if not card.is_empty() else ""
+	panel.add_theme_stylebox_override("panel", _make_card_button_style(rarity, 0.105, 2))
+
+
+func _apply_enemy_stack_panel_style(panel: Panel) -> void:
+	panel.add_theme_stylebox_override("panel", _make_enemy_stack_card_style(0.10, 2))
+
+
+func _add_stack_card_label(panel: Panel, text: String, color: Color) -> void:
+	var label = Label.new()
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.offset_left = 8
+	label.offset_top = 8
+	label.offset_right = -8
+	label.offset_bottom = -8
+	label.text = text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.clip_text = true
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size", 14)
+	panel.add_child(label)
+
+
 func _make_enemy_stack_card_style(shade: float, border_width: int) -> StyleBoxFlat:
 	var style = StyleBoxFlat.new()
 	style.bg_color = Color(shade * 1.05, shade * 0.55, shade * 0.48)
@@ -1293,12 +1318,12 @@ func _on_hand_card_mouse_exited(button: Button) -> void:
 	_clear_card_preview()
 
 
-func _on_stack_card_mouse_entered(entry: Dictionary, button: Button) -> void:
+func _on_stack_card_mouse_entered(entry: Dictionary, button: Control) -> void:
 	button.z_index = 90
 	_show_stack_card_preview(entry, button)
 
 
-func _on_stack_card_mouse_exited(button: Button, base_z_index: int) -> void:
+func _on_stack_card_mouse_exited(button: Control, base_z_index: int) -> void:
 	button.z_index = base_z_index
 	_clear_card_preview()
 
