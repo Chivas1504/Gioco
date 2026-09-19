@@ -2,6 +2,7 @@ extends Control
 
 const SCREEN_MENU = "menu"
 const SCREEN_COMBAT = "combat"
+const SCREEN_REWARD = "reward"
 const SCREEN_SAFE = "safe"
 const SAFE_POPUP_NONE = ""
 const SAFE_POPUP_COLLECTION = "collection"
@@ -20,6 +21,7 @@ var screen_mode = SCREEN_MENU
 var has_current_run = false
 var safe_popup_mode = SAFE_POPUP_NONE
 var reward_offers: Array = []
+var reward_card_claimed = false
 
 var screen_title: Label
 var fullscreen_button: Button
@@ -190,6 +192,7 @@ func _start_new_run_from_menu() -> void:
 	has_current_run = true
 	safe_popup_mode = SAFE_POPUP_NONE
 	reward_offers = []
+	reward_card_claimed = false
 	log_lines = []
 	_start_new_combat()
 	_push_log("La run comincia nel buio: sopravvivi al primo scontro, poi raggiungerai il Falò / Shop.")
@@ -200,7 +203,10 @@ func _resume_current_run() -> void:
 	if not has_current_run:
 		return
 	if combat_state.ended and combat_state.victory:
-		screen_mode = SCREEN_SAFE
+		if combat_state.rewards_claimed and reward_card_claimed:
+			screen_mode = SCREEN_SAFE
+		else:
+			screen_mode = SCREEN_REWARD
 	else:
 		screen_mode = SCREEN_COMBAT
 	_refresh_ui()
@@ -209,6 +215,7 @@ func _resume_current_run() -> void:
 func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 	defeat_snapshot_saved = false
 	reward_offers = []
+	reward_card_claimed = false
 	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
 		_start_shadow_combat(true)
 		return
@@ -220,6 +227,7 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 func _start_shadow_combat(second_encounter: bool) -> void:
 	defeat_snapshot_saved = false
 	reward_offers = []
+	reward_card_claimed = false
 	var enemy = GameDatabase.make_shadow_boss(run_state.shadow_memory, run_state.fear, second_encounter)
 	combat_state.start_combat(run_state, enemy)
 	if second_encounter:
@@ -255,6 +263,9 @@ func _refresh_ui() -> void:
 			run_state.map_position.x,
 			run_state.map_position.y,
 		]
+	elif screen_mode == SCREEN_REWARD:
+		enemy_label.text = "Nemico sconfitto: %s" % String(combat_state.enemy.get("name", "Nemico"))
+		intent_label.text = "Raccogli il bottino e scegli una carta, poi torna al Falò / Shop."
 	else:
 		enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d | Sangue perso %d | Marchio %s" % [
 			combat_state.enemy.get("name", "Nemico"),
@@ -279,6 +290,12 @@ func _refresh_ui() -> void:
 		action_scroll.visible = false
 		log_label.visible = false
 		_render_safe_summary()
+	elif screen_mode == SCREEN_REWARD:
+		screen_title.text = "Ricompensa"
+		cards_title.visible = false
+		action_scroll.visible = false
+		log_label.visible = false
+		_render_reward_summary()
 	else:
 		screen_title.text = "Combattimento"
 		cards_title.visible = true
@@ -370,6 +387,108 @@ func _render_safe_summary() -> void:
 		return
 
 	_render_shop_dashboard()
+
+
+func _render_reward_summary() -> void:
+	_ensure_reward_offers()
+	if reward_offers.is_empty():
+		reward_card_claimed = true
+	card_grid.columns = 1
+	for child in card_grid.get_children():
+		child.queue_free()
+	for child in safe_panel.get_children():
+		child.queue_free()
+
+	var reward_row = HBoxContainer.new()
+	reward_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	reward_row.add_theme_constant_override("separation", 14)
+	card_grid.add_child(reward_row)
+
+	var loot_panel = PanelContainer.new()
+	loot_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	loot_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	loot_panel.size_flags_stretch_ratio = 0.85
+	reward_row.add_child(loot_panel)
+
+	var loot_content = VBoxContainer.new()
+	loot_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	loot_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	loot_content.add_theme_constant_override("separation", 10)
+	loot_panel.add_child(loot_content)
+
+	var loot_title = Label.new()
+	loot_title.text = "Bottino"
+	loot_title.add_theme_font_size_override("font_size", 20)
+	loot_content.add_child(loot_title)
+
+	var soul_reward = int(combat_state.enemy.get("soul_reward", 0))
+	if bool(combat_state.enemy.get("is_shadow", false)):
+		soul_reward += int(combat_state.enemy.get("lost_souls", 0))
+	var loot_info = Label.new()
+	loot_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	loot_info.text = "Anime ottenibili: %d" % soul_reward
+	loot_content.add_child(loot_info)
+
+	var claim_button = Button.new()
+	claim_button.text = "Raccogli anime" if not combat_state.rewards_claimed else "Anime raccolte"
+	claim_button.disabled = combat_state.rewards_claimed
+	claim_button.custom_minimum_size = Vector2(240, 48)
+	claim_button.pressed.connect(_on_claim_rewards_pressed)
+	loot_content.add_child(claim_button)
+
+	var progress = Label.new()
+	progress.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	progress.text = "Carta scelta: %s" % ("si" if reward_card_claimed else "no")
+	loot_content.add_child(progress)
+
+	var enter_shop_button = Button.new()
+	enter_shop_button.text = "Vai al Falò / Shop"
+	enter_shop_button.disabled = not combat_state.rewards_claimed or not reward_card_claimed
+	enter_shop_button.custom_minimum_size = Vector2(240, 52)
+	enter_shop_button.pressed.connect(_enter_safe_area)
+	loot_content.add_child(enter_shop_button)
+
+	var card_panel = PanelContainer.new()
+	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_panel.size_flags_stretch_ratio = 1.55
+	reward_row.add_child(card_panel)
+
+	var card_content = VBoxContainer.new()
+	card_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_content.add_theme_constant_override("separation", 10)
+	card_panel.add_child(card_content)
+
+	var card_title = Label.new()
+	card_title.text = "Scegli 1 carta"
+	card_title.add_theme_font_size_override("font_size", 20)
+	card_content.add_child(card_title)
+
+	var reward_scroll = ScrollContainer.new()
+	reward_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	reward_scroll.horizontal_scroll_mode = 0
+	card_content.add_child(reward_scroll)
+
+	var reward_grid = GridContainer.new()
+	reward_grid.columns = CARD_GRID_COLUMNS
+	reward_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	reward_grid.add_theme_constant_override("h_separation", 12)
+	reward_grid.add_theme_constant_override("v_separation", 12)
+	reward_scroll.add_child(reward_grid)
+
+	for card_id in reward_offers:
+		var card = GameDatabase.get_card(card_id)
+		var reward_button = Button.new()
+		reward_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		reward_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		reward_button.text = _get_card_display_text(card_id, "ricompensa", "Scegli")
+		reward_button.disabled = reward_card_claimed
+		_apply_card_button_style(reward_button, card)
+		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
+		reward_grid.add_child(reward_button)
 
 
 func _render_shop_dashboard() -> void:
@@ -810,7 +929,6 @@ func _add_level_shop_box(parent: Control) -> void:
 
 
 func _add_reward_shop_box(parent: Control) -> void:
-	_ensure_reward_offers()
 	var panel = PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -828,39 +946,11 @@ func _add_reward_shop_box(parent: Control) -> void:
 	title.add_theme_font_size_override("font_size", 20)
 	content.add_child(title)
 
-	if not combat_state.rewards_claimed:
-		var claim_button = Button.new()
-		claim_button.text = "Raccogli anime"
-		claim_button.pressed.connect(_on_claim_rewards_pressed)
-		content.add_child(claim_button)
-
-	var reward_title = Label.new()
-	reward_title.text = "Ricompensa carta"
-	reward_title.add_theme_font_size_override("font_size", 16)
-	content.add_child(reward_title)
-
-	var reward_scroll = ScrollContainer.new()
-	reward_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reward_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	reward_scroll.horizontal_scroll_mode = 0
-	content.add_child(reward_scroll)
-
-	var reward_grid = GridContainer.new()
-	reward_grid.columns = CARD_GRID_COLUMNS
-	reward_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	reward_grid.add_theme_constant_override("h_separation", 12)
-	reward_grid.add_theme_constant_override("v_separation", 12)
-	reward_scroll.add_child(reward_grid)
-
-	for card_id in reward_offers:
-		var card = GameDatabase.get_card(card_id)
-		var reward_button = Button.new()
-		reward_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		reward_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
-		_apply_card_button_style(reward_button, card)
-		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
-		reward_grid.add_child(reward_button)
+	var placeholder = Label.new()
+	placeholder.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	placeholder.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	placeholder.text = "Le ricompense del combattimento si scelgono prima di arrivare qui. Questo riquadro ospitera carte in vendita, consumabili ed equipaggiamenti."
+	content.add_child(placeholder)
 
 	if run_state.has_shadow():
 		var shadow_title = Label.new()
@@ -903,7 +993,7 @@ func _render_safe_panel() -> void:
 	for child in safe_panel.get_children():
 		child.queue_free()
 
-	if screen_mode == SCREEN_SAFE:
+	if screen_mode == SCREEN_SAFE or screen_mode == SCREEN_REWARD:
 		return
 
 	var title = Label.new()
@@ -957,32 +1047,12 @@ func _render_safe_panel() -> void:
 
 
 func _render_shop_controls() -> void:
-	if not combat_state.rewards_claimed:
-		var claim_button = Button.new()
-		claim_button.text = "Raccogli anime"
-		claim_button.pressed.connect(_on_claim_rewards_pressed)
-		safe_panel.add_child(claim_button)
-
 	var collection_button = Button.new()
 	collection_button.text = "Nascondi collezione / loadout" if safe_popup_mode == SAFE_POPUP_COLLECTION else "Vedi collezione / loadout"
 	collection_button.pressed.connect(_on_toggle_collection_view_pressed)
 	safe_panel.add_child(collection_button)
 
 	_render_level_shop_controls()
-
-	var reward_title = Label.new()
-	reward_title.text = "Ricompensa carta"
-	safe_panel.add_child(reward_title)
-
-	_ensure_reward_offers()
-	for card_id in reward_offers:
-		var card = GameDatabase.get_card(card_id)
-		var reward_button = Button.new()
-		reward_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
-		_apply_card_button_style(reward_button, card)
-		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
-		safe_panel.add_child(reward_button)
 
 	if run_state.has_shadow():
 		var shadow_title = Label.new()
@@ -1038,7 +1108,7 @@ func _on_card_pressed(card_id: String) -> void:
 	_push_log(result.get("message", ""))
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade. Le carte torneranno disponibili nel prossimo combattimento.")
-		_enter_safe_area()
+		_enter_reward_area()
 	elif combat_state.ended:
 		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
@@ -1050,7 +1120,7 @@ func _on_end_intent_pressed() -> void:
 	_push_log(result.get("message", ""))
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade.")
-		_enter_safe_area()
+		_enter_reward_area()
 	elif combat_state.ended:
 		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
@@ -1066,9 +1136,13 @@ func _on_claim_rewards_pressed() -> void:
 
 
 func _on_reward_card_pressed(card_id: String) -> void:
+	if reward_card_claimed:
+		_push_log("Hai gia scelto la ricompensa carta di questo combattimento.")
+		_refresh_ui()
+		return
 	var card = GameDatabase.get_card(card_id)
 	if run_state.acquire_card(card_id):
-		reward_offers.erase(card_id)
+		reward_card_claimed = true
 		_push_log("Acquisisci %s. Classe attiva: %s." % [card.get("name", card_id), _get_class_display_text(run_state.active_class)])
 	else:
 		_push_log("Collezione piena o carta non valida.")
@@ -1155,8 +1229,14 @@ func _on_toggle_collection_view_pressed() -> void:
 	_refresh_ui()
 
 
-func _enter_safe_area() -> void:
+func _enter_reward_area() -> void:
 	_refresh_reward_offers()
+	if reward_offers.is_empty():
+		reward_card_claimed = true
+	screen_mode = SCREEN_REWARD
+
+
+func _enter_safe_area() -> void:
 	screen_mode = SCREEN_SAFE
 
 
