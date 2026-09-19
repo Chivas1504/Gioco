@@ -367,6 +367,7 @@ func _render_cards() -> void:
 		var button = Button.new()
 		var cost = combat_state.get_card_cost_for_current_intent(card_id)
 		button.custom_minimum_size = Vector2(190, 260)
+		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.text = _get_card_display_text(card_id, "costo %d" % cost, "Gioca")
 		button.tooltip_text = "Classe: %s" % GameDatabase.get_class_name(card.get("class_id", CardRules.CLASS_NEUTRAL))
 		button.disabled = not combat_state.can_play_card(card_id)
@@ -554,7 +555,7 @@ func _add_collection_card(parent: Control, card_id: String) -> void:
 	var card = GameDatabase.get_card(card_id)
 	var panel = PanelContainer.new()
 	panel.custom_minimum_size = Vector2(190, 260)
-	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(panel)
 
 	var rarity = String(card.get("rarity", "")) if not card.is_empty() else ""
@@ -659,14 +660,15 @@ func _get_card_display_text(card_id: String, detail_text: String, action_text: S
 
 func _apply_card_button_style(button: Button, card: Dictionary) -> void:
 	var rarity = String(card.get("rarity", "")) if not card.is_empty() else ""
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	button.add_theme_stylebox_override("normal", _make_card_button_style(rarity, 0.105, 2))
 	button.add_theme_stylebox_override("hover", _make_card_button_style(rarity, 0.145, 3))
 	button.add_theme_stylebox_override("pressed", _make_card_button_style(rarity, 0.075, 3))
-	button.add_theme_stylebox_override("disabled", _make_card_button_style(rarity, 0.06, 1))
+	button.add_theme_stylebox_override("disabled", _make_card_button_style(rarity, 0.085, 2))
 	button.add_theme_color_override("font_color", Color(0.92, 0.90, 0.86))
 	button.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.86))
 	button.add_theme_color_override("font_pressed_color", Color(0.86, 0.80, 0.70))
-	button.add_theme_color_override("font_disabled_color", Color(0.46, 0.44, 0.40))
+	button.add_theme_color_override("font_disabled_color", Color(0.68, 0.65, 0.58))
 	button.add_theme_font_size_override("font_size", 14)
 
 
@@ -769,17 +771,24 @@ func _add_level_shop_box(parent: Control) -> void:
 	level_hint.text = "Scegli una carta: sali di livello, ottieni +5 vita/stamina fino a 100 e quella carta prende +1."
 	content.add_child(level_hint)
 
+	var level_scroll = ScrollContainer.new()
+	level_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	level_scroll.horizontal_scroll_mode = 0
+	content.add_child(level_scroll)
+
 	var level_grid = GridContainer.new()
 	level_grid.columns = 2
 	level_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	level_grid.add_theme_constant_override("h_separation", 12)
 	level_grid.add_theme_constant_override("v_separation", 12)
-	content.add_child(level_grid)
+	level_scroll.add_child(level_grid)
 
 	for card_id in run_state.collection:
 		var card = GameDatabase.get_card(card_id)
 		var level_button = Button.new()
 		level_button.custom_minimum_size = Vector2(180, 245)
+		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
@@ -815,12 +824,18 @@ func _add_reward_shop_box(parent: Control) -> void:
 	reward_title.add_theme_font_size_override("font_size", 16)
 	content.add_child(reward_title)
 
+	var reward_scroll = ScrollContainer.new()
+	reward_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	reward_scroll.horizontal_scroll_mode = 0
+	content.add_child(reward_scroll)
+
 	var reward_grid = GridContainer.new()
 	reward_grid.columns = 2
 	reward_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reward_grid.add_theme_constant_override("h_separation", 12)
 	reward_grid.add_theme_constant_override("v_separation", 12)
-	content.add_child(reward_grid)
+	reward_scroll.add_child(reward_grid)
 
 	for card_id in REWARD_POOL:
 		if run_state.collection.has(card_id):
@@ -828,6 +843,7 @@ func _add_reward_shop_box(parent: Control) -> void:
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
 		reward_button.custom_minimum_size = Vector2(180, 245)
+		reward_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
 		_apply_card_button_style(reward_button, card)
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
