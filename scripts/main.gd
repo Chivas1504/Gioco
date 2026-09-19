@@ -250,7 +250,7 @@ func _refresh_ui() -> void:
 		log_label.text = "\n".join(log_lines)
 		return
 
-	player_label.text = "PG Lv %d | Classe: %s\nVita %d/%d\nStamina %d/%d\nAnime %d\nSangue %d\nPaura %d" % [
+	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Paura %d" % [
 		run_state.player_level,
 		GameDatabase.get_class_name(run_state.active_class),
 		run_state.health,
@@ -418,36 +418,60 @@ func _render_shop_dashboard() -> void:
 
 
 func _render_safe_popup_page() -> void:
-	var popup_row = HBoxContainer.new()
-	popup_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	popup_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	popup_row.add_theme_constant_override("separation", 12)
-	card_grid.add_child(popup_row)
+	var popup_panel = PanelContainer.new()
+	popup_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_grid.add_child(popup_panel)
 
-	var left_rail = VBoxContainer.new()
-	left_rail.custom_minimum_size = Vector2(64, 0)
-	left_rail.add_theme_constant_override("separation", 8)
-	popup_row.add_child(left_rail)
-	_add_safe_nav_button(left_rail, "C", "Collezione / loadout", SAFE_POPUP_COLLECTION)
-	_add_safe_nav_button(left_rail, "M", "Mappa", SAFE_POPUP_MAP)
-	_add_safe_nav_button(left_rail, "I", "Impostazioni", SAFE_POPUP_SETTINGS)
+	var popup_layout = VBoxContainer.new()
+	popup_layout.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_layout.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	popup_layout.add_theme_constant_override("separation", 12)
+	popup_panel.add_child(popup_layout)
+
+	var scroll = ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = 0
+
+	var header = HBoxContainer.new()
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_layout.add_child(header)
+
+	var title = Label.new()
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.text = _get_safe_popup_title()
+	title.add_theme_font_size_override("font_size", 22)
+	header.add_child(title)
+
+	var up_button = Button.new()
+	up_button.text = "Su"
+	up_button.tooltip_text = "Scorri verso l'alto"
+	up_button.custom_minimum_size = Vector2(64, 44)
+	up_button.pressed.connect(_on_popup_scroll_pressed.bind(scroll, -360))
+	header.add_child(up_button)
+
+	var down_button = Button.new()
+	down_button.text = "Giu"
+	down_button.tooltip_text = "Scorri verso il basso"
+	down_button.custom_minimum_size = Vector2(64, 44)
+	down_button.pressed.connect(_on_popup_scroll_pressed.bind(scroll, 360))
+	header.add_child(down_button)
+
 	var close_button = Button.new()
 	close_button.text = "X"
 	close_button.tooltip_text = "Chiudi pagina"
 	close_button.custom_minimum_size = Vector2(54, 44)
 	close_button.pressed.connect(_on_close_safe_popup_pressed)
-	left_rail.add_child(close_button)
+	header.add_child(close_button)
 
-	var popup_panel = PanelContainer.new()
-	popup_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	popup_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	popup_row.add_child(popup_panel)
+	popup_layout.add_child(scroll)
 
 	var content = VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 10)
-	popup_panel.add_child(content)
+	scroll.add_child(content)
 
 	if safe_popup_mode == SAFE_POPUP_COLLECTION:
 		_add_collection_content(content)
@@ -455,6 +479,20 @@ func _render_safe_popup_page() -> void:
 		_add_map_popup_content(content)
 	elif safe_popup_mode == SAFE_POPUP_SETTINGS:
 		_add_settings_popup_content(content)
+
+
+func _get_safe_popup_title() -> String:
+	if safe_popup_mode == SAFE_POPUP_COLLECTION:
+		return "Collezione / Loadout"
+	if safe_popup_mode == SAFE_POPUP_MAP:
+		return "Mappa"
+	if safe_popup_mode == SAFE_POPUP_SETTINGS:
+		return "Impostazioni"
+	return "Pagina"
+
+
+func _on_popup_scroll_pressed(scroll: ScrollContainer, amount: int) -> void:
+	scroll.scroll_vertical = max(0, scroll.scroll_vertical + amount)
 
 
 func _add_collection_content(parent: VBoxContainer) -> void:
