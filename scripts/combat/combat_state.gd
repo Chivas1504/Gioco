@@ -121,7 +121,11 @@ func stage_card(card_id: String) -> Dictionary:
 	if used_sorcerer_bonus:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
 	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
-	_stage_enemy_card(messages)
+	if round_starter == "player":
+		_stage_enemy_card(messages)
+	else:
+		stack_turn_owner = "resolve"
+		messages.append("Sei entrato per secondo: puoi risolvere la pila prima della prossima carta nemica.")
 	return {
 		"ok": true,
 		"message": " ".join(messages),

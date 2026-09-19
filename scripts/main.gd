@@ -17,7 +17,11 @@ const HAND_CARD_WIDTH = 118
 const HAND_CARD_HEIGHT = 170
 const HAND_CARD_COLUMNS = 12
 const HAND_CARD_ZOOM = 1.12
+const HAND_CARD_MIN_SCALE = 0.62
 const STACK_CARD_OFFSET = Vector2(22, 16)
+const STACK_CARD_MIN_SCALE = 0.55
+const STACK_CARD_PREVIEW_WIDTH = 230
+const STACK_CARD_PREVIEW_HEIGHT = 150
 
 var run_state = RunState.new()
 var combat_state = CombatState.new()
@@ -420,13 +424,17 @@ func _render_cards() -> void:
 	for child in card_grid.get_children():
 		child.queue_free()
 
-	for card_id in combat_state.get_hand_card_ids():
+	var hand_card_ids = combat_state.get_hand_card_ids()
+	var hand_scale = _get_hand_card_scale(hand_card_ids.size())
+	var hand_card_size = Vector2(HAND_CARD_WIDTH, HAND_CARD_HEIGHT) * hand_scale
+	for card_id in hand_card_ids:
 		var card = GameDatabase.get_card(card_id)
 		var button = Button.new()
 		var cost = combat_state.get_card_cost_for_current_intent(card_id)
-		button.custom_minimum_size = Vector2(HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
+		button.custom_minimum_size = hand_card_size
+		button.size = hand_card_size
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		button.pivot_offset = Vector2(float(HAND_CARD_WIDTH) / 2.0, HAND_CARD_HEIGHT)
+		button.pivot_offset = Vector2(hand_card_size.x / 2.0, hand_card_size.y)
 		button.text = _get_hand_card_display_text(card_id, cost)
 		button.tooltip_text = "Classe: %s" % _get_class_display_text(String(card.get("class_id", CardRules.CLASS_NEUTRAL)))
 		button.disabled = not combat_state.can_play_card(card_id)
@@ -448,30 +456,37 @@ func _render_combat_stack_area() -> void:
 	hand_spacer.add_child(center)
 
 	var staged_cards = combat_state.get_staged_stack_entries()
+	var stack_scale = _get_stack_card_scale(staged_cards.size())
+	var stack_card_size = Vector2(CARD_WIDTH, CARD_HEIGHT) * stack_scale
+	var stack_offset = STACK_CARD_OFFSET * stack_scale
 	var stack_board = Control.new()
 	stack_board.custom_minimum_size = Vector2(
-		CARD_WIDTH + STACK_CARD_OFFSET.x * max(0, staged_cards.size() - 1),
-		CARD_HEIGHT + STACK_CARD_OFFSET.y * max(0, staged_cards.size() - 1)
+		stack_card_size.x + stack_offset.x * max(0, staged_cards.size() - 1),
+		stack_card_size.y + stack_offset.y * max(0, staged_cards.size() - 1)
 	)
 	center.add_child(stack_board)
 
 	for index in range(staged_cards.size()):
 		var entry: Dictionary = staged_cards[index]
 		var stack_card = Button.new()
-		stack_card.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		stack_card.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		stack_card.position = STACK_CARD_OFFSET * index
+		stack_card.custom_minimum_size = stack_card_size
+		stack_card.size = stack_card_size
+		stack_card.position = stack_offset * index
 		stack_card.z_index = index
 		stack_card.focus_mode = Control.FOCUS_NONE
-		stack_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		stack_card.mouse_filter = Control.MOUSE_FILTER_STOP
 		if String(entry.get("owner", "")) == "enemy":
-			stack_card.text = _get_enemy_stack_card_display_text(entry)
+			stack_card.text = _get_enemy_stack_card_display_text(entry, true)
+			stack_card.tooltip_text = _get_enemy_stack_card_display_text(entry, false)
 			_apply_enemy_stack_card_style(stack_card)
 		else:
 			var card_id = String(entry.get("card_id", ""))
 			var card = GameDatabase.get_card(card_id)
-			stack_card.text = _get_card_display_text(card_id, "in pila", "Pronta")
+			stack_card.text = _get_stack_player_card_display_text(card_id)
+			stack_card.tooltip_text = _get_card_display_text(card_id, "in pila", "Pronta")
 			_apply_card_button_style(stack_card, card)
+		stack_card.mouse_entered.connect(_on_stack_card_mouse_entered.bind(entry, stack_card))
+		stack_card.mouse_exited.connect(_on_stack_card_mouse_exited.bind(stack_card, index))
 		stack_board.add_child(stack_card)
 
 
@@ -881,18 +896,60 @@ func _get_hand_card_display_text(card_id: String, cost: int) -> String:
 	]
 
 
-func _get_enemy_stack_card_display_text(entry: Dictionary) -> String:
+func _get_stack_card_scale(count: int) -> float:
+	if count <= 4:
+		return 1.0
+	var shrink = 1.0 - float(count - 4) * 0.055
+	return max(STACK_CARD_MIN_SCALE, shrink)
+
+
+func _get_hand_card_scale(count: int) -> float:
+	if count <= 0:
+		return 1.0
+	var available_width = card_grid.size.x
+	if available_width < 240.0:
+		available_width = get_viewport_rect().size.x - 420.0
+	var required_width = float(count * HAND_CARD_WIDTH + max(0, count - 1) * 6)
+	if required_width <= available_width:
+		return 1.0
+	var scaled = available_width / max(1.0, float(count * HAND_CARD_WIDTH))
+	return clamp(scaled, HAND_CARD_MIN_SCALE, 1.0)
+
+
+func _get_stack_player_card_display_text(card_id: String) -> String:
+	var card = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		return "%s\nCarta" % card_id
+	var cost = combat_state.get_card_cost_for_current_intent(card_id)
+	return "%s\n%s\nCosto %d" % [
+		card.get("name", card_id),
+		_rarity_label(card.get("rarity", "")),
+		cost,
+	]
+
+
+func _get_enemy_stack_card_display_text(entry: Dictionary, compact: bool = false) -> String:
 	var intent: Dictionary = {}
 	if entry.has("intent"):
 		intent = entry["intent"]
 	var intent_name = String(intent.get("name", "Intento"))
 	if intent.get("kind") == "attack":
+		if compact:
+			return "%s\nAttacco\n%d danni" % [
+				intent_name,
+				int(intent.get("damage", 0)),
+			]
 		return "%s\n%s\nAttacco\n%d danni\nPronta" % [
 			enemy_label.text.split("|")[0].strip_edges(),
 			intent_name,
 			int(intent.get("damage", 0)),
 		]
 	if intent.get("kind") == "buff":
+		if compact:
+			return "%s\nRito\n+%d forza" % [
+				intent_name,
+				int(intent.get("strength", 0)),
+			]
 		return "%s\n%s\nRito\n+%d forza\nPronta" % [
 			enemy_label.text.split("|")[0].strip_edges(),
 			intent_name,
@@ -1003,6 +1060,16 @@ func _on_hand_card_mouse_exited(button: Button) -> void:
 	_clear_card_preview()
 
 
+func _on_stack_card_mouse_entered(entry: Dictionary, button: Button) -> void:
+	button.z_index = 90
+	_show_stack_card_preview(entry, button)
+
+
+func _on_stack_card_mouse_exited(button: Button, base_z_index: int) -> void:
+	button.z_index = base_z_index
+	_clear_card_preview()
+
+
 func _show_card_preview(card_id: String, source_button: Control) -> void:
 	_clear_card_preview()
 	hover_card_preview = PanelContainer.new()
@@ -1041,10 +1108,93 @@ func _show_card_preview(card_id: String, source_button: Control) -> void:
 	_add_card_detail_content(content, card_id)
 
 
+func _show_stack_card_preview(entry: Dictionary, source_button: Control) -> void:
+	_clear_card_preview()
+	hover_card_preview = PanelContainer.new()
+	hover_card_preview.custom_minimum_size = Vector2(STACK_CARD_PREVIEW_WIDTH, STACK_CARD_PREVIEW_HEIGHT)
+	hover_card_preview.size = Vector2(STACK_CARD_PREVIEW_WIDTH, STACK_CARD_PREVIEW_HEIGHT)
+	hover_card_preview.z_index = 120
+	add_child(hover_card_preview)
+
+	var is_enemy = String(entry.get("owner", "")) == "enemy"
+	var border_color = Color(0.70, 0.18, 0.14)
+	if not is_enemy:
+		var card_id = String(entry.get("card_id", ""))
+		var card = GameDatabase.get_card(card_id)
+		border_color = _rarity_color(String(card.get("rarity", "")) if not card.is_empty() else "")
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.09, 0.08, 0.07)
+	style.border_color = border_color
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 8
+	style.content_margin_top = 8
+	style.content_margin_right = 8
+	style.content_margin_bottom = 8
+	hover_card_preview.add_theme_stylebox_override("panel", style)
+
+	var preview_position = source_button.global_position + Vector2(source_button.size.x + 12.0, -20.0)
+	var viewport_size = get_viewport_rect().size
+	preview_position.x = clamp(preview_position.x, 12.0, viewport_size.x - STACK_CARD_PREVIEW_WIDTH - 12.0)
+	preview_position.y = clamp(preview_position.y, 12.0, viewport_size.y - STACK_CARD_PREVIEW_HEIGHT - 12.0)
+	hover_card_preview.global_position = preview_position
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 4)
+	hover_card_preview.add_child(content)
+
+	if is_enemy:
+		_add_enemy_stack_detail_content(content, entry)
+	else:
+		_add_stack_player_detail_content(content, String(entry.get("card_id", "")))
+
+
 func _clear_card_preview() -> void:
 	if hover_card_preview != null:
 		hover_card_preview.queue_free()
 		hover_card_preview = null
+
+
+func _add_stack_player_detail_content(parent: VBoxContainer, card_id: String) -> void:
+	var card = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		var missing = Label.new()
+		missing.text = "Carta non trovata"
+		parent.add_child(missing)
+		return
+	var cost = combat_state.get_card_cost_for_current_intent(card_id)
+	var title = Label.new()
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", 15)
+	title.text = "%s | %s | costo %d" % [card.get("name", card_id), _rarity_label(card.get("rarity", "")), cost]
+	parent.add_child(title)
+	var effect = Label.new()
+	effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect.text = String(card.get("effect_text", ""))
+	parent.add_child(effect)
+
+
+func _add_enemy_stack_detail_content(parent: VBoxContainer, entry: Dictionary) -> void:
+	var intent: Dictionary = {}
+	if entry.has("intent"):
+		intent = entry["intent"]
+	var title = Label.new()
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.add_theme_font_size_override("font_size", 15)
+	title.text = "%s | %s" % [enemy_label.text.split("|")[0].strip_edges(), intent.get("name", "Intento")]
+	parent.add_child(title)
+	var detail = Label.new()
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if intent.get("kind") == "attack":
+		detail.text = "Attacco: %d danni quando la pila si risolve." % int(intent.get("damage", 0))
+	elif intent.get("kind") == "buff":
+		detail.text = "Rito: il nemico ottiene +%d forza." % int(intent.get("strength", 0))
+	else:
+		detail.text = "Intento nemico in pila."
+	parent.add_child(detail)
 
 
 func _add_card_detail_content(parent: VBoxContainer, card_id: String) -> void:
