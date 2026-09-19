@@ -13,6 +13,10 @@ const MIN_WINDOW_SIZE = Vector2i(960, 540)
 const CARD_WIDTH = 190
 const CARD_HEIGHT = 260
 const CARD_GRID_COLUMNS = 3
+const HAND_CARD_WIDTH = 118
+const HAND_CARD_HEIGHT = 170
+const HAND_CARD_COLUMNS = 6
+const HAND_CARD_ZOOM = 1.12
 
 var run_state = RunState.new()
 var combat_state = CombatState.new()
@@ -31,9 +35,11 @@ var intent_label: Label
 var log_label: RichTextLabel
 var cards_title: Label
 var card_grid: GridContainer
+var hand_spacer: Control
 var safe_panel: VBoxContainer
 var action_scroll: ScrollContainer
 var end_intent_button: Button
+var hover_card_preview: PanelContainer
 var defeat_snapshot_saved = false
 
 func _ready() -> void:
@@ -129,6 +135,10 @@ func _build_ui() -> void:
 	cards_title.text = "Carte build disponibili"
 	cards_title.add_theme_font_size_override("font_size", 18)
 	left_column.add_child(cards_title)
+
+	hand_spacer = Control.new()
+	hand_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left_column.add_child(hand_spacer)
 
 	card_grid = GridContainer.new()
 	card_grid.columns = 4
@@ -239,7 +249,9 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 
 func _refresh_ui() -> void:
 	_refresh_fullscreen_button()
+	_clear_card_preview()
 	if screen_mode == SCREEN_MENU:
+		hand_spacer.visible = false
 		log_label.visible = true
 		action_scroll.visible = true
 		_render_start_menu()
@@ -286,20 +298,23 @@ func _refresh_ui() -> void:
 
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
+		hand_spacer.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
 		_render_safe_summary()
 	elif screen_mode == SCREEN_REWARD:
 		screen_title.text = "Ricompensa"
+		hand_spacer.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
 		_render_reward_summary()
 	else:
 		screen_title.text = "Combattimento"
+		hand_spacer.visible = true
 		cards_title.visible = true
-		cards_title.text = "Carte build disponibili"
+		cards_title.text = "Mano"
 		action_scroll.visible = true
 		log_label.visible = true
 		_render_cards()
@@ -320,6 +335,8 @@ func _render_start_menu() -> void:
 
 func _render_menu_buttons() -> void:
 	card_grid.columns = 1
+	card_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for child in card_grid.get_children():
 		child.queue_free()
 
@@ -360,6 +377,10 @@ func _render_menu_panel() -> void:
 
 func _render_cards() -> void:
 	card_grid.columns = _get_combat_card_columns()
+	card_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	card_grid.size_flags_vertical = Control.SIZE_SHRINK_END
+	card_grid.add_theme_constant_override("h_separation", 6)
+	card_grid.add_theme_constant_override("v_separation", 6)
 	for child in card_grid.get_children():
 		child.queue_free()
 
@@ -367,18 +388,25 @@ func _render_cards() -> void:
 		var card = GameDatabase.get_card(card_id)
 		var button = Button.new()
 		var cost = combat_state.get_card_cost_for_current_intent(card_id)
-		button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		button.custom_minimum_size = Vector2(HAND_CARD_WIDTH, HAND_CARD_HEIGHT)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		button.text = _get_card_display_text(card_id, "costo %d" % cost, "Gioca")
+		button.pivot_offset = Vector2(float(HAND_CARD_WIDTH) / 2.0, HAND_CARD_HEIGHT)
+		button.text = _get_hand_card_display_text(card_id, cost)
 		button.tooltip_text = "Classe: %s" % _get_class_display_text(String(card.get("class_id", CardRules.CLASS_NEUTRAL)))
 		button.disabled = not combat_state.can_play_card(card_id)
 		_apply_card_button_style(button, card)
+		button.mouse_entered.connect(_on_hand_card_mouse_entered.bind(card_id, button))
+		button.mouse_exited.connect(_on_hand_card_mouse_exited.bind(button))
 		button.pressed.connect(_on_card_pressed.bind(card_id))
 		card_grid.add_child(button)
 
 
 func _render_safe_summary() -> void:
 	card_grid.columns = 1
+	card_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_grid.add_theme_constant_override("h_separation", 10)
+	card_grid.add_theme_constant_override("v_separation", 10)
 	for child in card_grid.get_children():
 		child.queue_free()
 
@@ -394,6 +422,10 @@ func _render_reward_summary() -> void:
 	if reward_offers.is_empty():
 		reward_card_claimed = true
 	card_grid.columns = 1
+	card_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	card_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_grid.add_theme_constant_override("h_separation", 10)
+	card_grid.add_theme_constant_override("v_separation", 10)
 	for child in card_grid.get_children():
 		child.queue_free()
 	for child in safe_panel.get_children():
@@ -759,6 +791,20 @@ func _get_card_display_text(card_id: String, detail_text: String, action_text: S
 	]
 
 
+func _get_hand_card_display_text(card_id: String, cost: int) -> String:
+	var card = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		return "%s\n?" % card_id
+	var level = run_state.get_card_level(card_id)
+	var level_text = " +%d" % level if level > 0 else ""
+	return "%s%s\n%s\nCosto %d" % [
+		card.get("name", card_id),
+		level_text,
+		_rarity_label(card.get("rarity", "")),
+		cost,
+	]
+
+
 func _format_card_button_effect(effect_text: String) -> String:
 	var words = effect_text.split(" ")
 	var lines = []
@@ -814,6 +860,106 @@ func _make_card_button_style(rarity: String, shade: float, border_width: int) ->
 	style.content_margin_right = 10
 	style.content_margin_bottom = 10
 	return style
+
+
+func _on_hand_card_mouse_entered(card_id: String, button: Button) -> void:
+	button.scale = Vector2(HAND_CARD_ZOOM, HAND_CARD_ZOOM)
+	button.z_index = 10
+	_show_card_preview(card_id, button)
+
+
+func _on_hand_card_mouse_exited(button: Button) -> void:
+	button.scale = Vector2.ONE
+	button.z_index = 0
+	_clear_card_preview()
+
+
+func _show_card_preview(card_id: String, source_button: Control) -> void:
+	_clear_card_preview()
+	hover_card_preview = PanelContainer.new()
+	hover_card_preview.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+	hover_card_preview.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+	hover_card_preview.z_index = 100
+	add_child(hover_card_preview)
+
+	var card = GameDatabase.get_card(card_id)
+	var rarity = String(card.get("rarity", "")) if not card.is_empty() else ""
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.105, 0.095, 0.085)
+	style.border_color = _rarity_color(rarity)
+	style.set_border_width_all(3)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 10
+	style.content_margin_top = 10
+	style.content_margin_right = 10
+	style.content_margin_bottom = 10
+	hover_card_preview.add_theme_stylebox_override("panel", style)
+
+	var preview_position = source_button.global_position + Vector2(
+		-float(CARD_WIDTH - HAND_CARD_WIDTH) / 2.0,
+		-float(CARD_HEIGHT) - 18.0
+	)
+	var viewport_size = get_viewport_rect().size
+	preview_position.x = clamp(preview_position.x, 12.0, viewport_size.x - CARD_WIDTH - 12.0)
+	preview_position.y = clamp(preview_position.y, 12.0, viewport_size.y - CARD_HEIGHT - 12.0)
+	hover_card_preview.global_position = preview_position
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 6)
+	hover_card_preview.add_child(content)
+	_add_card_detail_content(content, card_id)
+
+
+func _clear_card_preview() -> void:
+	if hover_card_preview != null:
+		hover_card_preview.queue_free()
+		hover_card_preview = null
+
+
+func _add_card_detail_content(parent: VBoxContainer, card_id: String) -> void:
+	var card = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		var missing = Label.new()
+		missing.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		missing.text = "%s\nCarta non trovata" % card_id
+		parent.add_child(missing)
+		return
+
+	var level = run_state.get_card_level(card_id)
+	var level_text = " +%d" % level if level > 0 else ""
+	var class_id = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	var cost = GameDatabase.get_base_stamina_cost(card, run_state.active_class, run_state.collection)
+	if screen_mode == SCREEN_COMBAT:
+		cost = combat_state.get_card_cost_for_current_intent(card_id)
+
+	var name_label = Label.new()
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.add_theme_font_size_override("font_size", 16)
+	name_label.text = "%s%s" % [card.get("name", card_id), level_text]
+	parent.add_child(name_label)
+
+	var meta_label = Label.new()
+	meta_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	meta_label.text = "%s\n%s | costo %d" % [
+		_get_class_display_text(class_id),
+		_rarity_label(card.get("rarity", "")),
+		cost,
+	]
+	parent.add_child(meta_label)
+
+	var separator = HSeparator.new()
+	parent.add_child(separator)
+
+	var effect_label = Label.new()
+	effect_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	effect_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	effect_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect_label.text = String(card.get("effect_text", ""))
+	parent.add_child(effect_label)
 
 
 func _add_map_popup_content(parent: VBoxContainer) -> void:
@@ -1340,9 +1486,9 @@ func _get_combat_card_columns() -> int:
 	var available_width = card_grid.size.x
 	if available_width < 240.0:
 		available_width = get_viewport_rect().size.x - action_scroll.custom_minimum_size.x - 96.0
-	var columns = floori(available_width / float(CARD_WIDTH + 40))
+	var columns = floori(available_width / float(HAND_CARD_WIDTH + 12))
 	if columns < 1:
 		columns = 1
-	if columns > CARD_GRID_COLUMNS:
-		columns = CARD_GRID_COLUMNS
+	if columns > HAND_CARD_COLUMNS:
+		columns = HAND_CARD_COLUMNS
 	return columns
