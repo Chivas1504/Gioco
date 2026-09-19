@@ -123,11 +123,8 @@ func stage_card(card_id: String) -> Dictionary:
 	if used_sorcerer_bonus:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
 	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
-	if round_starter == "player":
-		_stage_enemy_card(messages)
-	else:
-		stack_turn_owner = "resolve"
-		messages.append("Sei entrato per secondo: puoi risolvere la pila prima della prossima carta nemica.")
+	stack_turn_owner = "resolve"
+	messages.append("Scegli se risolvere la pila o passare il turno al nemico.")
 	return {
 		"ok": true,
 		"message": " ".join(messages),
@@ -145,7 +142,6 @@ func get_staged_card_count() -> int:
 func can_pass_stack_turn() -> bool:
 	return (
 		not ended
-		and round_starter == "enemy"
 		and has_staged_cards()
 		and (stack_turn_owner == "player" or stack_turn_owner == "resolve")
 	)
@@ -211,8 +207,22 @@ func resolve_staged_cards() -> Dictionary:
 	for entry in stack:
 		var stack_entry: Dictionary = entry
 		if String(stack_entry.get("owner", "")) == "enemy":
+			if int(damage_pool.get("damage", 0)) > 0:
+				_apply_damage_pool(damage_pool, killed_before, messages)
+				damage_pool = {
+					"damage": 0,
+					"recover_stamina_on_kill": 0,
+					"gain_blood_on_kill": 0,
+				}
+				if _stop_stack_if_combat_ended(messages):
+					return {"ok": true, "message": " ".join(messages)}
 			_apply_enemy_stack_entry(stack_entry, incoming_pool, messages)
 		else:
+			if int(incoming_pool.get("damage", 0)) > 0:
+				_apply_incoming_damage_pool(incoming_pool, messages)
+				incoming_pool = {"damage": 0}
+				if _stop_stack_if_combat_ended(messages):
+					return {"ok": true, "message": " ".join(messages)}
 			var card_id = String(stack_entry.get("card_id", ""))
 			var card = GameDatabase.get_card(card_id)
 			if card.is_empty():
@@ -225,21 +235,29 @@ func resolve_staged_cards() -> Dictionary:
 				else:
 					messages.append("%s si risolve." % card.get("name", card_id))
 				messages.append_array(_apply_card_effects(card, level, damage_pool))
+				if _stop_stack_if_combat_ended(messages):
+					return {"ok": true, "message": " ".join(messages)}
 
 	_apply_damage_pool(damage_pool, killed_before, messages)
+	if _stop_stack_if_combat_ended(messages):
+		return {"ok": true, "message": " ".join(messages)}
 	_apply_incoming_damage_pool(incoming_pool, messages)
+	if _stop_stack_if_combat_ended(messages):
+		return {"ok": true, "message": " ".join(messages)}
+	_apply_end_of_intent_status(messages)
+	if _stop_stack_if_combat_ended(messages):
+		return {"ok": true, "message": " ".join(messages)}
+	_tick_temporary_statuses()
+	var enemy_cards_played = max(1, enemy_cards_staged_this_round)
+	_reset_intent_state()
+	_apply_end_of_round_class_effects(messages)
+	if _stop_stack_if_combat_ended(messages):
+		return {"ok": true, "message": " ".join(messages)}
+	enemy["intent_index"] = int(enemy.get("intent_index", 0)) + enemy_cards_played
+	stamina_spent_this_round = 0
+	_apply_round_start_class_effects(messages)
+	_start_new_stack_turn(messages)
 	_check_end_state()
-	if not ended:
-		_apply_end_of_intent_status(messages)
-		_tick_temporary_statuses()
-		var enemy_cards_played = max(1, enemy_cards_staged_this_round)
-		_reset_intent_state()
-		_apply_end_of_round_class_effects(messages)
-		enemy["intent_index"] = int(enemy.get("intent_index", 0)) + enemy_cards_played
-		stamina_spent_this_round = 0
-		_apply_round_start_class_effects(messages)
-		_start_new_stack_turn(messages)
-		_check_end_state()
 	return {"ok": true, "message": " ".join(messages)}
 
 
@@ -650,6 +668,22 @@ func _check_end_state() -> void:
 	elif run_state.health <= 0 or run_state.stamina <= 0:
 		ended = true
 		victory = false
+
+
+func _stop_stack_if_combat_ended(messages: Array) -> bool:
+	if enemy.get("health", 0) <= 0:
+		ended = true
+		victory = true
+	elif run_state.health <= 0:
+		ended = true
+		victory = false
+	if not ended:
+		return false
+	if victory:
+		messages.append("La pila si interrompe: il nemico cade.")
+	else:
+		messages.append("La pila si interrompe: crolli prima che il resto si risolva.")
+	return true
 
 
 func _get_card_trigger_count(card: Dictionary) -> int:

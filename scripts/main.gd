@@ -19,8 +19,8 @@ const HAND_CARD_HEIGHT = 170
 const HAND_CARD_COLUMNS = 12
 const HAND_CARD_ZOOM = 1.12
 const HAND_CARD_MIN_SCALE = 0.62
-const STACK_CARD_OFFSET = Vector2(22, 16)
-const STACK_CARD_MIN_SCALE = 0.45
+const STACK_CARD_OFFSET = Vector2(18, 12)
+const STACK_CARD_MIN_SCALE = 0.58
 const STACK_CARD_PREVIEW_WIDTH = 230
 const STACK_CARD_PREVIEW_HEIGHT = 150
 
@@ -483,7 +483,7 @@ func _render_combat_stack_area() -> void:
 	var staged_cards = combat_state.get_staged_stack_entries()
 	var stack_scale = _get_stack_card_scale(staged_cards.size())
 	var stack_card_size = Vector2(CARD_WIDTH, CARD_HEIGHT) * stack_scale
-	var stack_offset = STACK_CARD_OFFSET * stack_scale
+	var stack_offset = _get_stack_card_offset(staged_cards.size(), stack_scale)
 	var stack_board = Control.new()
 	stack_board.custom_minimum_size = Vector2(
 		stack_card_size.x + stack_offset.x * max(0, staged_cards.size() - 1),
@@ -1119,8 +1119,15 @@ func _get_hand_card_display_text(card_id: String, cost: int) -> String:
 func _get_stack_card_scale(count: int) -> float:
 	if count <= 4:
 		return 1.0
-	var shrink = 1.0 - float(count - 4) * 0.075
+	var shrink = 1.0 - float(count - 4) * 0.04
 	return max(STACK_CARD_MIN_SCALE, shrink)
+
+
+func _get_stack_card_offset(count: int, scale: float) -> Vector2:
+	if count <= 1:
+		return Vector2.ZERO
+	var crowding = max(0.45, 1.0 - float(max(0, count - 8)) * 0.045)
+	return STACK_CARD_OFFSET * scale * crowding
 
 
 func _get_hand_card_scale(count: int) -> float:
