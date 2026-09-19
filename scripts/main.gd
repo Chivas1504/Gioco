@@ -31,6 +31,7 @@ var has_current_run = false
 var safe_popup_mode = SAFE_POPUP_NONE
 var reward_offers: Array = []
 var reward_card_claimed = false
+var selected_shop_level_card = ""
 
 var screen_title: Label
 var fullscreen_button: Button
@@ -258,6 +259,7 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 	defeat_snapshot_saved = false
 	reward_offers = []
 	reward_card_claimed = false
+	selected_shop_level_card = ""
 	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
 		_start_shadow_combat(true)
 		return
@@ -270,6 +272,7 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 	defeat_snapshot_saved = false
 	reward_offers = []
 	reward_card_claimed = false
+	selected_shop_level_card = ""
 	var enemy = GameDatabase.make_shadow_boss(run_state.shadow_memory, run_state.fear, second_encounter)
 	combat_state.start_combat(run_state, enemy)
 	if second_encounter:
@@ -631,6 +634,8 @@ func _get_visible_soul_reward() -> int:
 
 
 func _render_shop_dashboard() -> void:
+	_ensure_selected_shop_level_card()
+
 	var dashboard = HBoxContainer.new()
 	dashboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	dashboard.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -645,14 +650,155 @@ func _render_shop_dashboard() -> void:
 	_add_safe_nav_button(left_rail, "M", "Mappa", SAFE_POPUP_MAP)
 	_add_safe_nav_button(left_rail, "I", "Impostazioni", SAFE_POPUP_SETTINGS)
 
-	var shop_row = HBoxContainer.new()
-	shop_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	shop_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	shop_row.add_theme_constant_override("separation", 14)
-	dashboard.add_child(shop_row)
+	var shop = HBoxContainer.new()
+	shop.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shop.add_theme_constant_override("separation", 18)
+	dashboard.add_child(shop)
 
-	_add_level_shop_box(shop_row)
-	_add_reward_shop_box(shop_row)
+	_add_unified_shop_cards(shop)
+	_add_unified_shop_side(shop)
+
+
+func _ensure_selected_shop_level_card() -> void:
+	if selected_shop_level_card.is_empty() or not run_state.collection.has(selected_shop_level_card):
+		selected_shop_level_card = String(run_state.collection[0]) if not run_state.collection.is_empty() else ""
+
+
+func _add_unified_shop_cards(parent: Control) -> void:
+	var left = VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left.size_flags_stretch_ratio = 1.1
+	left.add_theme_constant_override("separation", 10)
+	parent.add_child(left)
+
+	var title = Label.new()
+	title.text = "Carte"
+	title.add_theme_font_size_override("font_size", 20)
+	left.add_child(title)
+
+	var hint = Label.new()
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.text = "Scegli una carta da potenziare quando acquisti un livello."
+	left.add_child(hint)
+
+	var grid_center = CenterContainer.new()
+	grid_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left.add_child(grid_center)
+
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	grid.add_theme_constant_override("h_separation", 18)
+	grid.add_theme_constant_override("v_separation", 18)
+	grid_center.add_child(grid)
+
+	var shop_cards = _get_shop_level_cards()
+	for card_id in shop_cards:
+		var card = GameDatabase.get_card(card_id)
+		var card_button = Button.new()
+		card_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		card_button.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		var action_text = "Selezionata" if card_id == selected_shop_level_card else "Seleziona"
+		card_button.text = _get_card_display_text(card_id, "+%d" % run_state.get_card_level(card_id), action_text)
+		_apply_card_button_style(card_button, card)
+		card_button.pressed.connect(_on_shop_level_card_selected.bind(card_id))
+		grid.add_child(card_button)
+
+
+func _get_shop_level_cards() -> Array:
+	var cards: Array = []
+	for card_id in run_state.collection:
+		cards.append(card_id)
+		if cards.size() >= 4:
+			break
+	return cards
+
+
+func _add_unified_shop_side(parent: Control) -> void:
+	var side = VBoxContainer.new()
+	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	side.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	side.size_flags_stretch_ratio = 1.0
+	side.add_theme_constant_override("separation", 18)
+	parent.add_child(side)
+
+	_add_unified_level_button(side)
+	_add_unified_consumables(side)
+
+
+func _add_unified_level_button(parent: VBoxContainer) -> void:
+	var level_area = VBoxContainer.new()
+	level_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_area.add_theme_constant_override("separation", 8)
+	parent.add_child(level_area)
+
+	var title = Label.new()
+	title.text = "Livello"
+	title.add_theme_font_size_override("font_size", 20)
+	level_area.add_child(title)
+
+	var selected_name = "nessuna carta"
+	if not selected_shop_level_card.is_empty():
+		selected_name = String(GameDatabase.get_card(selected_shop_level_card).get("name", selected_shop_level_card))
+	var info = Label.new()
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.text = "Costo: %d anime | Potenziamento: %s" % [run_state.next_level_cost(), selected_name]
+	level_area.add_child(info)
+
+	var level_button = Button.new()
+	level_button.text = "Acquista livello"
+	level_button.custom_minimum_size = Vector2(260, 56)
+	level_button.disabled = selected_shop_level_card.is_empty() or run_state.get_material("anime") < run_state.next_level_cost()
+	level_button.pressed.connect(_on_shop_level_button_pressed)
+	level_area.add_child(level_button)
+
+
+func _add_unified_consumables(parent: VBoxContainer) -> void:
+	var consumable_area = VBoxContainer.new()
+	consumable_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	consumable_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	consumable_area.add_theme_constant_override("separation", 8)
+	parent.add_child(consumable_area)
+
+	var title = Label.new()
+	title.text = "Consumabili"
+	title.add_theme_font_size_override("font_size", 20)
+	consumable_area.add_child(title)
+
+	var grid = GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	consumable_area.add_child(grid)
+
+	for consumable in GameDatabase.get_consumables():
+		var consumable_data: Dictionary = consumable
+		var cost_data: Dictionary = {}
+		if consumable_data.has("cost"):
+			cost_data = consumable_data["cost"]
+		var consumable_button = Button.new()
+		consumable_button.custom_minimum_size = Vector2(250, 118)
+		consumable_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		consumable_button.text = "%s\nCosto: %s\n%s" % [
+			consumable_data.get("name", "Consumabile"),
+			_format_material_cost(cost_data),
+			consumable_data.get("effect_text", ""),
+		]
+		consumable_button.disabled = true
+		grid.add_child(consumable_button)
+
+
+func _format_material_cost(cost: Dictionary) -> String:
+	var parts: Array = []
+	for material_id in cost.keys():
+		parts.append("%s %d" % [String(material_id), int(cost.get(material_id, 0))])
+	return ", ".join(parts) if not parts.is_empty() else "gratis"
 
 
 func _render_safe_popup_page() -> void:
@@ -1585,6 +1731,19 @@ func _on_reward_card_pressed(card_id: String) -> void:
 	else:
 		_push_log("Collezione piena o carta non valida.")
 	_refresh_ui()
+
+
+func _on_shop_level_card_selected(card_id: String) -> void:
+	selected_shop_level_card = card_id
+	_refresh_ui()
+
+
+func _on_shop_level_button_pressed() -> void:
+	if selected_shop_level_card.is_empty():
+		_push_log("Scegli prima una carta da potenziare.")
+		_refresh_ui()
+		return
+	_on_level_up_pressed(selected_shop_level_card)
 
 
 func _on_level_up_pressed(card_id: String) -> void:

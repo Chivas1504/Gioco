@@ -450,6 +450,13 @@ static func get_card(card_id: String) -> Dictionary:
 	return {}
 
 
+static func get_consumables() -> Array:
+	var consumables = []
+	for consumable in CONSUMABLES:
+		consumables.append(consumable.duplicate(true))
+	return consumables
+
+
 static func get_cards_by_class(class_id: String) -> Array:
 	var cards = []
 	for card in BUILD_CARDS:
