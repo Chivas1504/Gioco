@@ -21,7 +21,6 @@ const HAND_CARD_ZOOM = 1.12
 const HAND_CARD_MIN_SCALE = 0.62
 const STACK_CARD_OFFSET = Vector2(18, 12)
 const STACK_CARD_MIN_SCALE = 0.58
-const STACK_VISIBLE_CARD_LIMIT = 7
 const STACK_CARD_PREVIEW_WIDTH = 230
 const STACK_CARD_PREVIEW_HEIGHT = 150
 
@@ -482,35 +481,22 @@ func _render_combat_stack_area() -> void:
 	hand_spacer.add_child(center)
 
 	var staged_cards = combat_state.get_staged_stack_entries()
-	var visible_start = max(0, staged_cards.size() - STACK_VISIBLE_CARD_LIMIT)
-	var visible_cards = staged_cards.slice(visible_start, staged_cards.size())
-	var hidden_count = visible_start
-	var hidden_label_height = 30 if hidden_count > 0 else 0
-	var stack_scale = _get_stack_card_scale(visible_cards.size())
+	var stack_scale = _get_stack_card_scale(staged_cards.size())
 	var stack_card_size = Vector2(CARD_WIDTH, CARD_HEIGHT) * stack_scale
-	var stack_offset = _get_stack_card_offset(visible_cards.size(), stack_scale)
+	var stack_offset = _get_stack_card_offset(staged_cards.size(), stack_scale)
 	var stack_board = Control.new()
 	stack_board.custom_minimum_size = Vector2(
-		stack_card_size.x + stack_offset.x * max(0, visible_cards.size() - 1),
-		stack_card_size.y + stack_offset.y * max(0, visible_cards.size() - 1) + hidden_label_height
+		stack_card_size.x + stack_offset.x * max(0, staged_cards.size() - 1),
+		stack_card_size.y + stack_offset.y * max(0, staged_cards.size() - 1)
 	)
 	center.add_child(stack_board)
 
-	if hidden_count > 0:
-		var hidden_label = Label.new()
-		hidden_label.text = "+%d carte sotto" % hidden_count
-		hidden_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		hidden_label.custom_minimum_size = Vector2(stack_board.custom_minimum_size.x, hidden_label_height)
-		hidden_label.size = hidden_label.custom_minimum_size
-		hidden_label.add_theme_font_size_override("font_size", 14)
-		stack_board.add_child(hidden_label)
-
-	for index in range(visible_cards.size()):
-		var entry: Dictionary = visible_cards[index]
+	for index in range(staged_cards.size()):
+		var entry: Dictionary = staged_cards[index]
 		var stack_card = Button.new()
 		stack_card.custom_minimum_size = stack_card_size
 		stack_card.size = stack_card_size
-		stack_card.position = stack_offset * index + Vector2(0, hidden_label_height)
+		stack_card.position = stack_offset * index
 		stack_card.z_index = index
 		stack_card.focus_mode = Control.FOCUS_NONE
 		stack_card.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -1137,11 +1123,11 @@ func _get_stack_card_scale(count: int) -> float:
 	return max(STACK_CARD_MIN_SCALE, shrink)
 
 
-func _get_stack_card_offset(count: int, scale: float) -> Vector2:
+func _get_stack_card_offset(count: int, _scale: float) -> Vector2:
 	if count <= 1:
 		return Vector2.ZERO
 	var crowding = max(0.45, 1.0 - float(max(0, count - 8)) * 0.045)
-	return STACK_CARD_OFFSET * scale * crowding
+	return STACK_CARD_OFFSET * crowding
 
 
 func _get_hand_card_scale(count: int) -> float:
