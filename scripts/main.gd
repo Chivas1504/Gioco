@@ -245,7 +245,7 @@ func _refresh_ui() -> void:
 		log_label.text = "\n".join(log_lines)
 		return
 
-	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Paura %d | Mondo Lv %d" % [
+	player_label.text = "PG Lv %d | Classe: %s\nVita %d/%d\nStamina %d/%d\nAnime %d\nSangue %d\nPaura %d" % [
 		run_state.player_level,
 		GameDatabase.get_class_name(run_state.active_class),
 		run_state.health,
@@ -255,16 +255,12 @@ func _refresh_ui() -> void:
 		run_state.get_material("anime"),
 		run_state.get_material("sangue"),
 		run_state.fear,
-		run_state.get_world_level(),
 	]
 	if screen_mode == SCREEN_SAFE:
 		enemy_label.text = "Nodo: %s (%s)" % [run_state.get_current_node_name(), run_state.get_current_node_type()]
-		intent_label.text = "Posizione: %d,%d | Boss finale: %d,%d | Distanza: %d" % [
+		intent_label.text = "Posizione: %d,%d" % [
 			run_state.map_position.x,
 			run_state.map_position.y,
-			run_state.final_boss_position.x,
-			run_state.final_boss_position.y,
-			run_state.get_distance_to_final_boss(),
 		]
 	else:
 		enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d | Sangue perso %d | Marchio %s" % [
@@ -286,11 +282,12 @@ func _refresh_ui() -> void:
 
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
-		cards_title.text = "Run corrente"
+		cards_title.visible = false
 		end_intent_button.visible = false
 		_render_safe_summary()
 	else:
 		screen_title.text = "Combattimento"
+		cards_title.visible = true
 		cards_title.text = "Carte build disponibili"
 		end_intent_button.visible = true
 		_render_cards()
@@ -303,6 +300,7 @@ func _render_start_menu() -> void:
 	player_label.text = ""
 	enemy_label.text = ""
 	intent_label.text = ""
+	cards_title.visible = true
 	cards_title.text = "Menu"
 	end_intent_button.visible = false
 	_render_menu_buttons()
@@ -391,12 +389,10 @@ func _render_safe_summary() -> void:
 	var map_status = Label.new()
 	map_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	map_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	map_status.text = "Mappa: sei in %d,%d. Nodo attuale: %s. Il boss finale della tua classe e in %d,%d." % [
+	map_status.text = "Mappa: sei in %d,%d. Nodo attuale: %s." % [
 		run_state.map_position.x,
 		run_state.map_position.y,
 		run_state.get_current_node_name(),
-		run_state.final_boss_position.x,
-		run_state.final_boss_position.y,
 	]
 	card_grid.add_child(map_status)
 
