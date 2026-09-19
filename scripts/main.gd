@@ -13,6 +13,9 @@ const BASE_WINDOW_SIZE = Vector2i(1280, 720)
 const MIN_WINDOW_SIZE = Vector2i(960, 540)
 const CARD_WIDTH = 190
 const CARD_HEIGHT = 260
+const SHOP_CARD_WIDTH = 150
+const SHOP_CARD_HEIGHT = 205
+const SHOP_CONSUMABLE_SLOT_SIZE = 70
 const CARD_GRID_COLUMNS = 3
 const HAND_CARD_WIDTH = 118
 const HAND_CARD_HEIGHT = 170
@@ -675,8 +678,8 @@ func _add_unified_shop_cards(parent: Control) -> void:
 	var left = VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	left.size_flags_stretch_ratio = 1.1
-	left.add_theme_constant_override("separation", 10)
+	left.size_flags_stretch_ratio = 0.92
+	left.add_theme_constant_override("separation", 8)
 	parent.add_child(left)
 
 	var title = Label.new()
@@ -686,7 +689,7 @@ func _add_unified_shop_cards(parent: Control) -> void:
 
 	var hint = Label.new()
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.text = "Compra nuove carte con le anime. Il potenziamento avviene solo quando sali di livello."
+	hint.text = "Compra nuove carte con le anime."
 	left.add_child(hint)
 
 	var grid_center = CenterContainer.new()
@@ -698,8 +701,8 @@ func _add_unified_shop_cards(parent: Control) -> void:
 	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	grid.add_theme_constant_override("h_separation", 18)
-	grid.add_theme_constant_override("v_separation", 18)
+	grid.add_theme_constant_override("h_separation", 14)
+	grid.add_theme_constant_override("v_separation", 14)
 	grid_center.add_child(grid)
 
 	if shop_card_offers.is_empty():
@@ -714,11 +717,12 @@ func _add_unified_shop_cards(parent: Control) -> void:
 			continue
 		var cost = _get_shop_card_cost(card)
 		var card_button = Button.new()
-		card_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		card_button.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		card_button.custom_minimum_size = Vector2(SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT)
+		card_button.size = Vector2(SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT)
 		card_button.text = _get_card_display_text(card_id, "%d anime" % cost, "Compra")
 		card_button.disabled = run_state.get_material("anime") < cost or run_state.collection.size() >= CardRules.COLLECTION_MAX
 		_apply_card_button_style(card_button, card)
+		card_button.add_theme_font_size_override("font_size", 12)
 		card_button.pressed.connect(_on_shop_card_buy_pressed.bind(card_id))
 		grid.add_child(card_button)
 
@@ -741,8 +745,8 @@ func _add_unified_shop_side(parent: Control) -> void:
 	var side = VBoxContainer.new()
 	side.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	side.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	side.size_flags_stretch_ratio = 1.0
-	side.add_theme_constant_override("separation", 18)
+	side.size_flags_stretch_ratio = 1.2
+	side.add_theme_constant_override("separation", 12)
 	parent.add_child(side)
 
 	_add_unified_level_button(side)
@@ -752,7 +756,7 @@ func _add_unified_shop_side(parent: Control) -> void:
 func _add_unified_level_button(parent: VBoxContainer) -> void:
 	var level_area = VBoxContainer.new()
 	level_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	level_area.add_theme_constant_override("separation", 8)
+	level_area.add_theme_constant_override("separation", 6)
 	parent.add_child(level_area)
 
 	var title = Label.new()
@@ -762,7 +766,7 @@ func _add_unified_level_button(parent: VBoxContainer) -> void:
 
 	var info = Label.new()
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.text = "Costo: %d anime. Dopo l'acquisto scegli nel popup quale carta della collezione potenziare." % run_state.next_level_cost()
+	info.text = "Costo: %d anime. Scegli nel popup quale carta potenziare." % run_state.next_level_cost()
 	level_area.add_child(info)
 
 	var level_button = Button.new()
@@ -777,7 +781,7 @@ func _add_unified_consumables(parent: VBoxContainer) -> void:
 	var consumable_area = VBoxContainer.new()
 	consumable_area.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	consumable_area.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	consumable_area.add_theme_constant_override("separation", 8)
+	consumable_area.add_theme_constant_override("separation", 10)
 	parent.add_child(consumable_area)
 
 	var title = Label.new()
@@ -786,28 +790,30 @@ func _add_unified_consumables(parent: VBoxContainer) -> void:
 	consumable_area.add_child(title)
 
 	var grid = GridContainer.new()
-	grid.columns = 2
-	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	grid.add_theme_constant_override("h_separation", 10)
-	grid.add_theme_constant_override("v_separation", 10)
+	grid.columns = 4
+	grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 16)
 	consumable_area.add_child(grid)
 
-	for consumable in GameDatabase.get_consumables():
-		var consumable_data: Dictionary = consumable
-		var cost_data: Dictionary = {}
-		if consumable_data.has("cost"):
-			cost_data = consumable_data["cost"]
-		var consumable_button = Button.new()
-		consumable_button.custom_minimum_size = Vector2(250, 118)
-		consumable_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		consumable_button.text = "%s\nCosto: %s\n%s" % [
-			consumable_data.get("name", "Consumabile"),
-			_format_material_cost(cost_data),
-			consumable_data.get("effect_text", ""),
-		]
-		consumable_button.disabled = true
-		grid.add_child(consumable_button)
+	for index in range(12):
+		var slot = PanelContainer.new()
+		slot.custom_minimum_size = Vector2(SHOP_CONSUMABLE_SLOT_SIZE, SHOP_CONSUMABLE_SLOT_SIZE)
+		slot.size = Vector2(SHOP_CONSUMABLE_SLOT_SIZE, SHOP_CONSUMABLE_SLOT_SIZE)
+		slot.tooltip_text = "Slot consumabile %d" % (index + 1)
+		slot.add_theme_stylebox_override("panel", _make_consumable_slot_style())
+		grid.add_child(slot)
+
+		var dot_center = CenterContainer.new()
+		dot_center.set_anchors_preset(Control.PRESET_FULL_RECT)
+		slot.add_child(dot_center)
+
+		var dot = Panel.new()
+		dot.custom_minimum_size = Vector2(18, 18)
+		dot.size = Vector2(18, 18)
+		dot.add_theme_stylebox_override("panel", _make_consumable_dot_style())
+		dot_center.add_child(dot)
 
 
 func _format_material_cost(cost: Dictionary) -> String:
@@ -1290,6 +1296,24 @@ func _make_enemy_stack_card_style(shade: float, border_width: int) -> StyleBoxFl
 	style.content_margin_top = 10
 	style.content_margin_right = 10
 	style.content_margin_bottom = 10
+	return style
+
+
+func _make_consumable_slot_style() -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.075, 0.07, 0.065)
+	style.border_color = Color(0.20, 0.19, 0.17)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	return style
+
+
+func _make_consumable_dot_style() -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(0.62, 0.56, 0.46)
+	style.border_color = Color(0.86, 0.78, 0.60)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(24)
 	return style
 
 
