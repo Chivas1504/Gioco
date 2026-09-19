@@ -9,6 +9,9 @@ const SAFE_POPUP_MAP = "map"
 const SAFE_POPUP_SETTINGS = "settings"
 const BASE_WINDOW_SIZE = Vector2i(1280, 720)
 const MIN_WINDOW_SIZE = Vector2i(960, 540)
+const CARD_WIDTH = 190
+const CARD_HEIGHT = 260
+const CARD_GRID_COLUMNS = 3
 
 var run_state = RunState.new()
 var combat_state = CombatState.new()
@@ -355,7 +358,7 @@ func _render_cards() -> void:
 		var card = GameDatabase.get_card(card_id)
 		var button = Button.new()
 		var cost = combat_state.get_card_cost_for_current_intent(card_id)
-		button.custom_minimum_size = Vector2(190, 260)
+		button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.text = _get_card_display_text(card_id, "costo %d" % cost, "Gioca")
 		button.tooltip_text = "Classe: %s" % _get_class_display_text(String(card.get("class_id", CardRules.CLASS_NEUTRAL)))
@@ -392,16 +395,14 @@ func _render_shop_dashboard() -> void:
 	_add_safe_nav_button(left_rail, "M", "Mappa", SAFE_POPUP_MAP)
 	_add_safe_nav_button(left_rail, "I", "Impostazioni", SAFE_POPUP_SETTINGS)
 
-	var shop_grid = GridContainer.new()
-	shop_grid.columns = 2
-	shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	shop_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	shop_grid.add_theme_constant_override("h_separation", 14)
-	shop_grid.add_theme_constant_override("v_separation", 14)
-	dashboard.add_child(shop_grid)
+	var shop_row = HBoxContainer.new()
+	shop_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shop_row.add_theme_constant_override("separation", 14)
+	dashboard.add_child(shop_row)
 
-	_add_level_shop_box(shop_grid)
-	_add_reward_shop_box(shop_grid)
+	_add_level_shop_box(shop_row)
+	_add_reward_shop_box(shop_row)
 
 
 func _render_safe_popup_page() -> void:
@@ -543,7 +544,7 @@ func _add_collection_section(parent: VBoxContainer, title_text: String, card_ids
 func _add_collection_card(parent: Control, card_id: String) -> void:
 	var card = GameDatabase.get_card(card_id)
 	var panel = PanelContainer.new()
-	panel.custom_minimum_size = Vector2(190, 260)
+	panel.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	parent.add_child(panel)
 
@@ -607,7 +608,7 @@ func _add_collection_card(parent: Control, card_id: String) -> void:
 
 func _get_collection_card_columns() -> int:
 	var available_width = get_viewport_rect().size.x - 120.0
-	var columns = floori(available_width / 210.0)
+	var columns = floori(available_width / float(CARD_WIDTH + 20))
 	if columns < 1:
 		columns = 1
 	if columns > 6:
@@ -642,16 +643,39 @@ func _get_card_display_text(card_id: String, detail_text: String, action_text: S
 		_get_class_display_text(class_id),
 		_rarity_label(card.get("rarity", "")),
 		detail_text,
-		card.get("effect_text", ""),
+		_format_card_button_effect(String(card.get("effect_text", ""))),
 		action_text,
 	]
 
 
+func _format_card_button_effect(effect_text: String) -> String:
+	var words = effect_text.split(" ")
+	var lines = []
+	var current_line = ""
+	var clipped = false
+	for word_index in range(words.size()):
+		var word = String(words[word_index])
+		var next_line = word if current_line.is_empty() else "%s %s" % [current_line, word]
+		if next_line.length() > 28 and not current_line.is_empty():
+			lines.append(current_line)
+			current_line = word
+			if lines.size() >= 2:
+				clipped = word_index < words.size() - 1
+				break
+		else:
+			current_line = next_line
+	if lines.size() < 2 and not current_line.is_empty():
+		lines.append(current_line)
+	if clipped and not lines.is_empty():
+		lines[lines.size() - 1] = "%s..." % String(lines[lines.size() - 1])
+	return "\n".join(lines)
+
+
 func _get_class_display_text(class_id: String) -> String:
-	var class_name = GameDatabase.get_class_name(class_id)
+	var display_name = GameDatabase.get_class_name(class_id)
 	if class_id == CardRules.CLASS_NEUTRAL:
-		return class_name
-	return "%s (%s)" % [class_name, _rarity_label(GameDatabase.get_class_rarity(class_id))]
+		return display_name
+	return "%s (%s)" % [display_name, _rarity_label(GameDatabase.get_class_rarity(class_id))]
 
 
 func _apply_card_button_style(button: Button, card: Dictionary) -> void:
@@ -743,6 +767,7 @@ func _add_level_shop_box(parent: Control) -> void:
 	var panel = PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 1.0
 	parent.add_child(panel)
 
 	var content = VBoxContainer.new()
@@ -783,7 +808,7 @@ func _add_level_shop_box(parent: Control) -> void:
 	for card_id in run_state.collection:
 		var card = GameDatabase.get_card(card_id)
 		var level_button = Button.new()
-		level_button.custom_minimum_size = Vector2(180, 245)
+		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
@@ -797,6 +822,7 @@ func _add_reward_shop_box(parent: Control) -> void:
 	var panel = PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	panel.size_flags_stretch_ratio = 1.35
 	parent.add_child(panel)
 
 	var content = VBoxContainer.new()
@@ -828,8 +854,8 @@ func _add_reward_shop_box(parent: Control) -> void:
 	content.add_child(reward_scroll)
 
 	var reward_grid = GridContainer.new()
-	reward_grid.columns = 2
-	reward_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_grid.columns = CARD_GRID_COLUMNS
+	reward_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	reward_grid.add_theme_constant_override("h_separation", 12)
 	reward_grid.add_theme_constant_override("v_separation", 12)
 	reward_scroll.add_child(reward_grid)
@@ -837,7 +863,7 @@ func _add_reward_shop_box(parent: Control) -> void:
 	for card_id in reward_offers:
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
-		reward_button.custom_minimum_size = Vector2(180, 245)
+		reward_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		reward_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
 		_apply_card_button_style(reward_button, card)
@@ -954,7 +980,7 @@ func _render_shop_controls() -> void:
 	for card_id in reward_offers:
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
-		reward_button.custom_minimum_size = Vector2(180, 245)
+		reward_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
 		_apply_card_button_style(reward_button, card)
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
@@ -997,7 +1023,7 @@ func _render_level_shop_controls() -> void:
 	for card_id in run_state.collection:
 		var card = GameDatabase.get_card(card_id)
 		var level_button = Button.new()
-		level_button.custom_minimum_size = Vector2(180, 245)
+		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
@@ -1236,9 +1262,9 @@ func _get_combat_card_columns() -> int:
 	var available_width = card_grid.size.x
 	if available_width < 240.0:
 		available_width = get_viewport_rect().size.x - action_scroll.custom_minimum_size.x - 96.0
-	var columns = floori(available_width / 230.0)
+	var columns = floori(available_width / float(CARD_WIDTH + 40))
 	if columns < 1:
 		columns = 1
-	if columns > 4:
-		columns = 4
+	if columns > CARD_GRID_COLUMNS:
+		columns = CARD_GRID_COLUMNS
 	return columns
