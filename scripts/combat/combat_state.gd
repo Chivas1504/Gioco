@@ -5,6 +5,7 @@ var run_state: RunState
 var enemy = {}
 var used_card_ids: Array = []
 var staged_card_ids: Array = []
+var staged_stack: Array = []
 var used_class_bonuses: Array = []
 var guard = 0
 var enemy_strength_bonus = 0
@@ -20,18 +21,23 @@ var ended = false
 var victory = false
 var rewards_claimed = false
 var low_health_fear_triggered = false
+var stack_turn_owner = "player"
+var round_starter = "player"
+var enemy_cards_staged_this_round = 0
 
 func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
 	enemy = p_enemy.duplicate(true)
 	used_card_ids = []
 	staged_card_ids = []
+	staged_stack = []
 	used_class_bonuses = []
 	guard = 0
 	enemy_strength_bonus = 0
 	weakened_next_intent = 0
 	incoming_damage_bonus = 0
 	next_damage_multiplier = 1.0
+	enemy_cards_staged_this_round = 0
 	temporary_cera = 0
 	next_sorcerer_damage_bonus = 0
 	stamina_spent_this_round = 0
@@ -42,6 +48,7 @@ func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	rewards_claimed = false
 	low_health_fear_triggered = false
 	_apply_round_start_class_effects([])
+	_start_new_stack_turn([])
 
 
 func current_intent() -> Dictionary:
@@ -63,6 +70,8 @@ func get_card_cost_for_current_intent(card_id: String) -> int:
 
 func can_play_card(card_id: String) -> bool:
 	if ended:
+		return false
+	if stack_turn_owner != "player":
 		return false
 	if not run_state.loadout.has(card_id):
 		return false
@@ -108,64 +117,106 @@ func stage_card(card_id: String) -> Dictionary:
 	stamina_spent_this_round += cost
 	used_card_ids.append(card_id)
 	staged_card_ids.append(card_id)
+	staged_stack.append({"owner": "player", "card_id": card_id})
 	if used_sorcerer_bonus:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
+	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
+	_stage_enemy_card(messages)
 	return {
 		"ok": true,
-		"message": "Impili %s. Stamina -%d." % [card.get("name", card_id), cost],
+		"message": " ".join(messages),
 	}
 
 
 func has_staged_cards() -> bool:
-	return not staged_card_ids.is_empty()
+	return not staged_stack.is_empty()
 
 
 func get_staged_card_count() -> int:
-	return staged_card_ids.size()
+	return staged_stack.size()
 
 
-func get_staged_card_ids() -> Array:
-	return staged_card_ids.duplicate()
+func get_staged_stack_entries() -> Array:
+	return staged_stack.duplicate(true)
+
+
+func get_hand_card_ids() -> Array:
+	var cards: Array = []
+	for card_id in run_state.loadout:
+		if not used_card_ids.has(card_id):
+			cards.append(card_id)
+	return cards
+
+
+func get_hand_card_count() -> int:
+	return get_hand_card_ids().size()
 
 
 func get_staged_card_names() -> Array:
 	var names: Array = []
-	for card_id in staged_card_ids:
-		var card = GameDatabase.get_card(String(card_id))
-		names.append(String(card.get("name", card_id)))
+	for entry in staged_stack:
+		var stack_entry: Dictionary = entry
+		if String(stack_entry.get("owner", "")) == "enemy":
+			var intent: Dictionary = {}
+			if stack_entry.has("intent"):
+				intent = stack_entry["intent"]
+			names.append("%s: %s" % [enemy.get("name", "Nemico"), intent.get("name", "Intento")])
+		else:
+			var card_id = String(stack_entry.get("card_id", ""))
+			var card = GameDatabase.get_card(card_id)
+			names.append(String(card.get("name", card_id)))
 	return names
 
 
 func resolve_staged_cards() -> Dictionary:
 	if ended:
 		return {"ok": false, "message": "Il combattimento e gia finito."}
-	if staged_card_ids.is_empty():
+	if staged_stack.is_empty():
 		return {"ok": false, "message": "Non hai carte nella pila."}
 
-	var stack = staged_card_ids.duplicate()
+	var stack = staged_stack.duplicate(true)
 	staged_card_ids = []
+	staged_stack = []
 	var messages = ["Risolvi la pila dal basso verso l'alto."]
 	var damage_pool = {
 		"damage": 0,
 		"recover_stamina_on_kill": 0,
 		"gain_blood_on_kill": 0,
 	}
+	var incoming_pool = {"damage": 0}
 	var killed_before = int(enemy.get("health", 0)) <= 0
-	for card_id in stack:
-		var card = GameDatabase.get_card(String(card_id))
-		if card.is_empty():
-			continue
-		var level = run_state.get_card_level(String(card_id))
-		var trigger_count = _get_card_trigger_count(card)
-		for trigger_index in range(trigger_count):
-			if trigger_index > 0:
-				messages.append("%s si riattiva." % card.get("name", card_id))
-			else:
-				messages.append("%s si risolve." % card.get("name", card_id))
-			messages.append_array(_apply_card_effects(card, level, damage_pool))
+	for entry in stack:
+		var stack_entry: Dictionary = entry
+		if String(stack_entry.get("owner", "")) == "enemy":
+			_apply_enemy_stack_entry(stack_entry, incoming_pool, messages)
+		else:
+			var card_id = String(stack_entry.get("card_id", ""))
+			var card = GameDatabase.get_card(card_id)
+			if card.is_empty():
+				continue
+			var level = run_state.get_card_level(card_id)
+			var trigger_count = _get_card_trigger_count(card)
+			for trigger_index in range(trigger_count):
+				if trigger_index > 0:
+					messages.append("%s si riattiva." % card.get("name", card_id))
+				else:
+					messages.append("%s si risolve." % card.get("name", card_id))
+				messages.append_array(_apply_card_effects(card, level, damage_pool))
 
 	_apply_damage_pool(damage_pool, killed_before, messages)
+	_apply_incoming_damage_pool(incoming_pool, messages)
 	_check_end_state()
+	if not ended:
+		_apply_end_of_intent_status(messages)
+		_tick_temporary_statuses()
+		var enemy_cards_played = max(1, enemy_cards_staged_this_round)
+		_reset_intent_state()
+		_apply_end_of_round_class_effects(messages)
+		enemy["intent_index"] = int(enemy.get("intent_index", 0)) + enemy_cards_played
+		stamina_spent_this_round = 0
+		_apply_round_start_class_effects(messages)
+		_start_new_stack_turn(messages)
+		_check_end_state()
 	return {"ok": true, "message": " ".join(messages)}
 
 
@@ -428,6 +479,76 @@ func _apply_damage_pool(damage_pool: Dictionary, killed_before: bool, messages: 
 		messages.append("Il bonus Vampiro ti restituisce sangue e vita.")
 
 
+func _start_new_stack_turn(messages: Array) -> void:
+	staged_stack = []
+	staged_card_ids = []
+	enemy_cards_staged_this_round = 0
+	if randi() % 2 == 0:
+		round_starter = "player"
+		stack_turn_owner = "player"
+		if not messages.is_empty():
+			messages.append("Hai l'iniziativa: giochi per primo.")
+	else:
+		round_starter = "enemy"
+		stack_turn_owner = "enemy"
+		_stage_enemy_card(messages)
+
+
+func _stage_enemy_card(messages: Array) -> void:
+	if ended:
+		return
+	var intent = _get_enemy_stack_intent()
+	if intent.is_empty():
+		stack_turn_owner = "player"
+		return
+	staged_stack.append({"owner": "enemy", "intent": intent})
+	enemy_cards_staged_this_round += 1
+	stack_turn_owner = "player"
+	if not messages.is_empty():
+		messages.append("%s impila %s." % [enemy.get("name", "Nemico"), intent.get("name", "Intento")])
+
+
+func _get_enemy_stack_intent() -> Dictionary:
+	var intents = enemy.get("intents", [])
+	if intents.is_empty():
+		return {}
+	var index = int(enemy.get("intent_index", 0)) + enemy_cards_staged_this_round
+	return intents[index % intents.size()].duplicate(true)
+
+
+func _apply_enemy_stack_entry(entry: Dictionary, incoming_pool: Dictionary, messages: Array) -> void:
+	var intent: Dictionary = {}
+	if entry.has("intent"):
+		intent = entry["intent"]
+	var intent_name = String(intent.get("name", "Intento"))
+	if intent.get("kind") == "attack":
+		var incoming = int(intent.get("damage", 0)) + enemy_strength_bonus + incoming_damage_bonus
+		incoming = max(0, incoming - enemy_card_cost_tax)
+		incoming = max(0, incoming - weakened_next_intent)
+		if ghost_phase_available and incoming > 0:
+			ghost_phase_available = false
+			messages.append("%s ti attraversa: il bonus Fantasma evita questo attacco." % intent_name)
+		else:
+			incoming_pool["damage"] = int(incoming_pool.get("damage", 0)) + incoming
+			messages.append("%s prepara %d danni." % [intent_name, incoming])
+	elif intent.get("kind") == "buff":
+		var strength = max(0, int(intent.get("strength", 0)) - enemy_card_cost_tax)
+		enemy_strength_bonus += strength
+		messages.append("%s: il nemico diventa piu feroce di %d." % [intent_name, strength])
+
+
+func _apply_incoming_damage_pool(incoming_pool: Dictionary, messages: Array) -> void:
+	var incoming = int(incoming_pool.get("damage", 0))
+	if incoming <= 0:
+		return
+	var blocked = min(guard, incoming)
+	incoming -= blocked
+	incoming = ceili(float(incoming) * next_damage_multiplier)
+	run_state.health = max(0, run_state.health - incoming)
+	messages.append("La pila nemica infligge %d danni in un unico colpo, %d bloccati." % [incoming, blocked])
+	_check_low_health_fear(messages)
+
+
 func _apply_end_of_intent_status(messages: Array) -> void:
 	var poison = int(enemy.get("poison", 0))
 	if poison > 0:
@@ -490,11 +611,13 @@ func _apply_end_of_round_class_effects(messages: Array) -> void:
 func _reset_intent_state() -> void:
 	used_card_ids = []
 	staged_card_ids = []
+	staged_stack = []
 	used_class_bonuses = []
 	guard = 0
 	weakened_next_intent = 0
 	incoming_damage_bonus = 0
 	next_damage_multiplier = 1.0
+	enemy_cards_staged_this_round = 0
 
 
 func _check_end_state() -> void:

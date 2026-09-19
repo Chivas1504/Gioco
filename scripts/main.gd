@@ -332,7 +332,8 @@ func _refresh_ui() -> void:
 		if combat_state.has_staged_cards():
 			end_intent_button.text = "Risolvi pila (%d)" % combat_state.get_staged_card_count()
 		else:
-			end_intent_button.text = "Risolvi intento nemico"
+			end_intent_button.text = "Gioca una carta"
+			end_intent_button.disabled = true
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
@@ -405,7 +406,7 @@ func _render_cards() -> void:
 	for child in card_grid.get_children():
 		child.queue_free()
 
-	for card_id in run_state.loadout:
+	for card_id in combat_state.get_hand_card_ids():
 		var card = GameDatabase.get_card(card_id)
 		var button = Button.new()
 		var cost = combat_state.get_card_cost_for_current_intent(card_id)
@@ -432,7 +433,7 @@ func _render_combat_stack_area() -> void:
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hand_spacer.add_child(center)
 
-	var staged_cards = combat_state.get_staged_card_ids()
+	var staged_cards = combat_state.get_staged_stack_entries()
 	var stack_board = Control.new()
 	stack_board.custom_minimum_size = Vector2(
 		CARD_WIDTH + STACK_CARD_OFFSET.x * max(0, staged_cards.size() - 1),
@@ -441,8 +442,7 @@ func _render_combat_stack_area() -> void:
 	center.add_child(stack_board)
 
 	for index in range(staged_cards.size()):
-		var card_id = String(staged_cards[index])
-		var card = GameDatabase.get_card(card_id)
+		var entry: Dictionary = staged_cards[index]
 		var stack_card = Button.new()
 		stack_card.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		stack_card.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
@@ -450,8 +450,14 @@ func _render_combat_stack_area() -> void:
 		stack_card.z_index = index
 		stack_card.focus_mode = Control.FOCUS_NONE
 		stack_card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		stack_card.text = _get_card_display_text(card_id, "in pila", "Pronta")
-		_apply_card_button_style(stack_card, card)
+		if String(entry.get("owner", "")) == "enemy":
+			stack_card.text = _get_enemy_stack_card_display_text(entry)
+			_apply_enemy_stack_card_style(stack_card)
+		else:
+			var card_id = String(entry.get("card_id", ""))
+			var card = GameDatabase.get_card(card_id)
+			stack_card.text = _get_card_display_text(card_id, "in pila", "Pronta")
+			_apply_card_button_style(stack_card, card)
 		stack_board.add_child(stack_card)
 
 
@@ -859,6 +865,26 @@ func _get_hand_card_display_text(card_id: String, cost: int) -> String:
 	]
 
 
+func _get_enemy_stack_card_display_text(entry: Dictionary) -> String:
+	var intent: Dictionary = {}
+	if entry.has("intent"):
+		intent = entry["intent"]
+	var intent_name = String(intent.get("name", "Intento"))
+	if intent.get("kind") == "attack":
+		return "%s\n%s\nAttacco\n%d danni\nPronta" % [
+			enemy_label.text.split("|")[0].strip_edges(),
+			intent_name,
+			int(intent.get("damage", 0)),
+		]
+	if intent.get("kind") == "buff":
+		return "%s\n%s\nRito\n+%d forza\nPronta" % [
+			enemy_label.text.split("|")[0].strip_edges(),
+			intent_name,
+			int(intent.get("strength", 0)),
+		]
+	return "%s\n%s\nIntento\nPronta" % [enemy_label.text.split("|")[0].strip_edges(), intent_name]
+
+
 func _format_staged_stack() -> String:
 	var names = combat_state.get_staged_card_names()
 	var text = ""
@@ -911,6 +937,29 @@ func _apply_card_button_style(button: Button, card: Dictionary) -> void:
 	button.add_theme_color_override("font_pressed_color", Color(0.86, 0.80, 0.70))
 	button.add_theme_color_override("font_disabled_color", Color(0.68, 0.65, 0.58))
 	button.add_theme_font_size_override("font_size", 14)
+
+
+func _apply_enemy_stack_card_style(button: Button) -> void:
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	button.add_theme_stylebox_override("normal", _make_enemy_stack_card_style(0.10, 2))
+	button.add_theme_stylebox_override("hover", _make_enemy_stack_card_style(0.13, 3))
+	button.add_theme_stylebox_override("pressed", _make_enemy_stack_card_style(0.075, 3))
+	button.add_theme_stylebox_override("disabled", _make_enemy_stack_card_style(0.085, 2))
+	button.add_theme_color_override("font_color", Color(0.94, 0.78, 0.72))
+	button.add_theme_font_size_override("font_size", 14)
+
+
+func _make_enemy_stack_card_style(shade: float, border_width: int) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(shade * 1.05, shade * 0.55, shade * 0.48)
+	style.border_color = Color(0.70, 0.18, 0.14)
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 10
+	style.content_margin_top = 10
+	style.content_margin_right = 10
+	style.content_margin_bottom = 10
+	return style
 
 
 func _make_card_button_style(rarity: String, shade: float, border_width: int) -> StyleBoxFlat:
@@ -1314,7 +1363,7 @@ func _on_end_intent_pressed() -> void:
 	if combat_state.has_staged_cards():
 		result = combat_state.resolve_staged_cards()
 	else:
-		result = combat_state.resolve_enemy_intent()
+		result = {"message": "Prima gioca una carta o aspetta che il nemico entri nella pila."}
 	_push_log(result.get("message", ""))
 	if combat_state.ended and combat_state.victory:
 		_push_log("Il nemico cade.")
@@ -1535,12 +1584,4 @@ func _rarity_label(rarity: String) -> String:
 
 
 func _get_combat_card_columns() -> int:
-	var available_width = card_grid.size.x
-	if available_width < 240.0:
-		available_width = get_viewport_rect().size.x - 96.0
-	var columns = floori(available_width / float(HAND_CARD_WIDTH + 12))
-	if columns < 1:
-		columns = 1
-	if columns > HAND_CARD_COLUMNS:
-		columns = HAND_CARD_COLUMNS
-	return columns
+	return max(1, combat_state.get_hand_card_count())
