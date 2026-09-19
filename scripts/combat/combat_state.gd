@@ -24,10 +24,12 @@ var low_health_fear_triggered = false
 var stack_turn_owner = "player"
 var round_starter = "player"
 var enemy_cards_staged_this_round = 0
+var initiative_rng = RandomNumberGenerator.new()
 
 func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
 	enemy = p_enemy.duplicate(true)
+	initiative_rng.randomize()
 	used_card_ids = []
 	staged_card_ids = []
 	staged_stack = []
@@ -138,6 +140,23 @@ func has_staged_cards() -> bool:
 
 func get_staged_card_count() -> int:
 	return staged_stack.size()
+
+
+func can_pass_stack_turn() -> bool:
+	return (
+		not ended
+		and round_starter == "enemy"
+		and has_staged_cards()
+		and (stack_turn_owner == "player" or stack_turn_owner == "resolve")
+	)
+
+
+func pass_stack_turn() -> Dictionary:
+	if not can_pass_stack_turn():
+		return {"ok": false, "message": "Non puoi passare adesso."}
+	var messages = ["Passi il turno senza risolvere la pila."]
+	_stage_enemy_card(messages)
+	return {"ok": true, "message": " ".join(messages)}
 
 
 func get_staged_stack_entries() -> Array:
@@ -487,7 +506,7 @@ func _start_new_stack_turn(messages: Array) -> void:
 	staged_stack = []
 	staged_card_ids = []
 	enemy_cards_staged_this_round = 0
-	if randi() % 2 == 0:
+	if initiative_rng.randi_range(0, 1) == 0:
 		round_starter = "player"
 		stack_turn_owner = "player"
 		if not messages.is_empty():

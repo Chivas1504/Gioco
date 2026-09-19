@@ -19,7 +19,7 @@ const HAND_CARD_COLUMNS = 12
 const HAND_CARD_ZOOM = 1.12
 const HAND_CARD_MIN_SCALE = 0.62
 const STACK_CARD_OFFSET = Vector2(22, 16)
-const STACK_CARD_MIN_SCALE = 0.55
+const STACK_CARD_MIN_SCALE = 0.45
 const STACK_CARD_PREVIEW_WIDTH = 230
 const STACK_CARD_PREVIEW_HEIGHT = 150
 
@@ -45,6 +45,7 @@ var combat_action_panel: VBoxContainer
 var safe_panel: VBoxContainer
 var action_scroll: ScrollContainer
 var end_intent_button: Button
+var pass_turn_button: Button
 var hover_card_preview: PanelContainer
 var defeat_snapshot_saved = false
 
@@ -159,6 +160,7 @@ func _build_ui() -> void:
 	combat_action_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	combat_action_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	combat_action_panel.alignment = BoxContainer.ALIGNMENT_CENTER
+	combat_action_panel.add_theme_constant_override("separation", 10)
 	combat_action_panel.visible = false
 	content_row.add_child(combat_action_panel)
 
@@ -169,6 +171,14 @@ func _build_ui() -> void:
 	end_intent_button.visible = false
 	end_intent_button.pressed.connect(_on_end_intent_pressed)
 	combat_action_panel.add_child(end_intent_button)
+
+	pass_turn_button = Button.new()
+	pass_turn_button.text = "Passa turno"
+	pass_turn_button.custom_minimum_size = Vector2(260, 46)
+	pass_turn_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	pass_turn_button.visible = false
+	pass_turn_button.pressed.connect(_on_pass_stack_turn_pressed)
+	combat_action_panel.add_child(pass_turn_button)
 
 	action_scroll = ScrollContainer.new()
 	action_scroll.custom_minimum_size = Vector2(300, 0)
@@ -276,6 +286,7 @@ func _refresh_ui() -> void:
 		hand_spacer.visible = false
 		combat_action_panel.visible = false
 		end_intent_button.visible = false
+		pass_turn_button.visible = false
 		log_label.visible = true
 		action_scroll.visible = true
 		_render_start_menu()
@@ -327,6 +338,7 @@ func _refresh_ui() -> void:
 		hand_spacer.visible = false
 		combat_action_panel.visible = false
 		end_intent_button.visible = false
+		pass_turn_button.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
@@ -336,6 +348,7 @@ func _refresh_ui() -> void:
 		hand_spacer.visible = false
 		combat_action_panel.visible = false
 		end_intent_button.visible = false
+		pass_turn_button.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
 		log_label.visible = false
@@ -346,6 +359,8 @@ func _refresh_ui() -> void:
 		combat_action_panel.visible = true
 		end_intent_button.visible = true
 		end_intent_button.disabled = combat_state.ended
+		pass_turn_button.visible = combat_state.can_pass_stack_turn()
+		pass_turn_button.disabled = not combat_state.can_pass_stack_turn()
 		if combat_state.has_staged_cards():
 			end_intent_button.text = "Risolvi pila (%d)" % combat_state.get_staged_card_count()
 		else:
@@ -368,6 +383,7 @@ func _render_start_menu() -> void:
 	combat_action_panel.visible = false
 	cards_title.visible = true
 	end_intent_button.visible = false
+	pass_turn_button.visible = false
 	cards_title.text = "Menu"
 	_render_menu_buttons()
 	_render_menu_panel()
@@ -899,7 +915,7 @@ func _get_hand_card_display_text(card_id: String, cost: int) -> String:
 func _get_stack_card_scale(count: int) -> float:
 	if count <= 4:
 		return 1.0
-	var shrink = 1.0 - float(count - 4) * 0.055
+	var shrink = 1.0 - float(count - 4) * 0.075
 	return max(STACK_CARD_MIN_SCALE, shrink)
 
 
@@ -1537,6 +1553,12 @@ func _on_end_intent_pressed() -> void:
 	elif combat_state.ended:
 		_save_shadow_after_defeat()
 		_push_log("La run finisce qui.")
+	_refresh_ui()
+
+
+func _on_pass_stack_turn_pressed() -> void:
+	var result = combat_state.pass_stack_turn()
+	_push_log(result.get("message", ""))
 	_refresh_ui()
 
 
