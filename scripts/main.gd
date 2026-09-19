@@ -8,6 +8,7 @@ const SAFE_POPUP_NONE = ""
 const SAFE_POPUP_COLLECTION = "collection"
 const SAFE_POPUP_MAP = "map"
 const SAFE_POPUP_SETTINGS = "settings"
+const SAFE_POPUP_LEVEL = "level"
 const BASE_WINDOW_SIZE = Vector2i(1280, 720)
 const MIN_WINDOW_SIZE = Vector2i(960, 540)
 const CARD_WIDTH = 190
@@ -31,7 +32,8 @@ var has_current_run = false
 var safe_popup_mode = SAFE_POPUP_NONE
 var reward_offers: Array = []
 var reward_card_claimed = false
-var selected_shop_level_card = ""
+var shop_card_offers: Array = []
+var shop_card_offers_generated = false
 
 var screen_title: Label
 var fullscreen_button: Button
@@ -236,6 +238,8 @@ func _start_new_run_from_menu() -> void:
 	safe_popup_mode = SAFE_POPUP_NONE
 	reward_offers = []
 	reward_card_claimed = false
+	shop_card_offers = []
+	shop_card_offers_generated = false
 	log_lines = []
 	_start_new_combat()
 	_push_log("La run comincia nel buio: sopravvivi al primo scontro, poi raggiungerai il Falò / Shop.")
@@ -259,7 +263,8 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 	defeat_snapshot_saved = false
 	reward_offers = []
 	reward_card_claimed = false
-	selected_shop_level_card = ""
+	shop_card_offers = []
+	shop_card_offers_generated = false
 	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
 		_start_shadow_combat(true)
 		return
@@ -272,7 +277,8 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 	defeat_snapshot_saved = false
 	reward_offers = []
 	reward_card_claimed = false
-	selected_shop_level_card = ""
+	shop_card_offers = []
+	shop_card_offers_generated = false
 	var enemy = GameDatabase.make_shadow_boss(run_state.shadow_memory, run_state.fear, second_encounter)
 	combat_state.start_combat(run_state, enemy)
 	if second_encounter:
@@ -634,7 +640,7 @@ func _get_visible_soul_reward() -> int:
 
 
 func _render_shop_dashboard() -> void:
-	_ensure_selected_shop_level_card()
+	_ensure_shop_card_offers()
 
 	var dashboard = HBoxContainer.new()
 	dashboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -660,9 +666,10 @@ func _render_shop_dashboard() -> void:
 	_add_unified_shop_side(shop)
 
 
-func _ensure_selected_shop_level_card() -> void:
-	if selected_shop_level_card.is_empty() or not run_state.collection.has(selected_shop_level_card):
-		selected_shop_level_card = String(run_state.collection[0]) if not run_state.collection.is_empty() else ""
+func _ensure_shop_card_offers() -> void:
+	if not shop_card_offers_generated:
+		shop_card_offers = GameDatabase.get_shop_card_offers(run_state.collection, run_state.active_class, run_state.acquired_classes)
+		shop_card_offers_generated = true
 
 
 func _add_unified_shop_cards(parent: Control) -> void:
@@ -674,13 +681,13 @@ func _add_unified_shop_cards(parent: Control) -> void:
 	parent.add_child(left)
 
 	var title = Label.new()
-	title.text = "Carte"
+	title.text = "Carte in vendita"
 	title.add_theme_font_size_override("font_size", 20)
 	left.add_child(title)
 
 	var hint = Label.new()
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.text = "Scegli una carta da potenziare quando acquisti un livello."
+	hint.text = "Compra nuove carte con le anime. Il potenziamento avviene solo quando sali di livello."
 	left.add_child(hint)
 
 	var grid_center = CenterContainer.new()
@@ -696,26 +703,39 @@ func _add_unified_shop_cards(parent: Control) -> void:
 	grid.add_theme_constant_override("v_separation", 18)
 	grid_center.add_child(grid)
 
-	var shop_cards = _get_shop_level_cards()
-	for card_id in shop_cards:
+	if shop_card_offers.is_empty():
+		var empty = Label.new()
+		empty.text = "Nessuna carta in vendita."
+		grid.add_child(empty)
+		return
+
+	for card_id in shop_card_offers:
 		var card = GameDatabase.get_card(card_id)
+		if card.is_empty():
+			continue
+		var cost = _get_shop_card_cost(card)
 		var card_button = Button.new()
 		card_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		card_button.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		var action_text = "Selezionata" if card_id == selected_shop_level_card else "Seleziona"
-		card_button.text = _get_card_display_text(card_id, "+%d" % run_state.get_card_level(card_id), action_text)
+		card_button.text = _get_card_display_text(card_id, "%d anime" % cost, "Compra")
+		card_button.disabled = run_state.get_material("anime") < cost or run_state.collection.size() >= CardRules.COLLECTION_MAX
 		_apply_card_button_style(card_button, card)
-		card_button.pressed.connect(_on_shop_level_card_selected.bind(card_id))
+		card_button.pressed.connect(_on_shop_card_buy_pressed.bind(card_id))
 		grid.add_child(card_button)
 
 
-func _get_shop_level_cards() -> Array:
-	var cards: Array = []
-	for card_id in run_state.collection:
-		cards.append(card_id)
-		if cards.size() >= 4:
-			break
-	return cards
+func _get_shop_card_cost(card: Dictionary) -> int:
+	match String(card.get("rarity", CardRules.RARITY_COMMON)):
+		CardRules.RARITY_COMMON:
+			return 35
+		CardRules.RARITY_UNCOMMON:
+			return 60
+		CardRules.RARITY_RARE:
+			return 95
+		CardRules.RARITY_LEGENDARY:
+			return 160
+		_:
+			return 50
 
 
 func _add_unified_shop_side(parent: Control) -> void:
@@ -741,19 +761,16 @@ func _add_unified_level_button(parent: VBoxContainer) -> void:
 	title.add_theme_font_size_override("font_size", 20)
 	level_area.add_child(title)
 
-	var selected_name = "nessuna carta"
-	if not selected_shop_level_card.is_empty():
-		selected_name = String(GameDatabase.get_card(selected_shop_level_card).get("name", selected_shop_level_card))
 	var info = Label.new()
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	info.text = "Costo: %d anime | Potenziamento: %s" % [run_state.next_level_cost(), selected_name]
+	info.text = "Costo: %d anime. Dopo l'acquisto scegli nel popup quale carta della collezione potenziare." % run_state.next_level_cost()
 	level_area.add_child(info)
 
 	var level_button = Button.new()
-	level_button.text = "Acquista livello"
+	level_button.text = "Sali di livello"
 	level_button.custom_minimum_size = Vector2(260, 56)
-	level_button.disabled = selected_shop_level_card.is_empty() or run_state.get_material("anime") < run_state.next_level_cost()
-	level_button.pressed.connect(_on_shop_level_button_pressed)
+	level_button.disabled = run_state.collection.is_empty() or run_state.get_material("anime") < run_state.next_level_cost()
+	level_button.pressed.connect(_on_open_level_popup_pressed)
 	level_area.add_child(level_button)
 
 
@@ -863,6 +880,8 @@ func _render_safe_popup_page() -> void:
 		_add_map_popup_content(content)
 	elif safe_popup_mode == SAFE_POPUP_SETTINGS:
 		_add_settings_popup_content(content)
+	elif safe_popup_mode == SAFE_POPUP_LEVEL:
+		_add_level_popup_content(content)
 
 
 func _get_safe_popup_title() -> String:
@@ -872,6 +891,8 @@ func _get_safe_popup_title() -> String:
 		return "Mappa"
 	if safe_popup_mode == SAFE_POPUP_SETTINGS:
 		return "Impostazioni"
+	if safe_popup_mode == SAFE_POPUP_LEVEL:
+		return "Scegli carta da potenziare"
 	return "Pagina"
 
 
@@ -912,6 +933,43 @@ func _add_collection_content(parent: VBoxContainer) -> void:
 		if not run_state.loadout.has(card_id):
 			reserve_cards.append(card_id)
 	_add_collection_section(parent, "In collezione, fuori loadout", reserve_cards)
+
+
+func _add_level_popup_content(parent: VBoxContainer) -> void:
+	var title = Label.new()
+	title.text = "Sali di livello"
+	title.add_theme_font_size_override("font_size", 18)
+	parent.add_child(title)
+
+	var info = Label.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	info.text = "Costo: %d anime. Scegli una carta della collezione: il PG sale di livello, ottiene +5 vita/stamina fino a 100 e quella carta prende +1." % run_state.next_level_cost()
+	parent.add_child(info)
+
+	if run_state.collection.is_empty():
+		var empty = Label.new()
+		empty.text = "Non hai carte in collezione."
+		parent.add_child(empty)
+		return
+
+	var grid = GridContainer.new()
+	grid.columns = _get_collection_card_columns()
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	parent.add_child(grid)
+
+	for card_id in run_state.collection:
+		var card = GameDatabase.get_card(card_id)
+		var level_button = Button.new()
+		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
+		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
+		_apply_card_button_style(level_button, card)
+		level_button.pressed.connect(_on_level_popup_card_pressed.bind(card_id))
+		grid.add_child(level_button)
 
 
 func _add_collection_section(parent: VBoxContainer, title_text: String, card_ids: Array) -> void:
@@ -1733,17 +1791,51 @@ func _on_reward_card_pressed(card_id: String) -> void:
 	_refresh_ui()
 
 
-func _on_shop_level_card_selected(card_id: String) -> void:
-	selected_shop_level_card = card_id
+func _on_shop_card_buy_pressed(card_id: String) -> void:
+	var card = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		_push_log("Carta non valida.")
+		_refresh_ui()
+		return
+	var cost = _get_shop_card_cost(card)
+	if run_state.get_material("anime") < cost:
+		_push_log("Non hai abbastanza anime per comprare %s." % card.get("name", card_id))
+		_refresh_ui()
+		return
+	if run_state.collection.size() >= CardRules.COLLECTION_MAX:
+		_push_log("La collezione e piena.")
+		_refresh_ui()
+		return
+	if not run_state.spend_material("anime", cost):
+		_push_log("Non hai abbastanza anime.")
+		_refresh_ui()
+		return
+	if run_state.acquire_card(card_id):
+		shop_card_offers.erase(card_id)
+		_push_log("Compri %s per %d anime." % [card.get("name", card_id), cost])
+	else:
+		run_state.add_material("anime", cost)
+		_push_log("Non puoi acquistare questa carta.")
 	_refresh_ui()
 
 
-func _on_shop_level_button_pressed() -> void:
-	if selected_shop_level_card.is_empty():
-		_push_log("Scegli prima una carta da potenziare.")
-		_refresh_ui()
-		return
-	_on_level_up_pressed(selected_shop_level_card)
+func _on_open_level_popup_pressed() -> void:
+	safe_popup_mode = SAFE_POPUP_LEVEL
+	_refresh_ui()
+
+
+func _on_level_popup_card_pressed(card_id: String) -> void:
+	var card = GameDatabase.get_card(card_id)
+	if run_state.buy_level_up(card_id):
+		_push_log("Sali al livello %d. %s ora e +%d." % [
+			run_state.player_level,
+			card.get("name", card_id),
+			run_state.get_card_level(card_id),
+		])
+		safe_popup_mode = SAFE_POPUP_NONE
+	else:
+		_push_log("Non hai abbastanza anime.")
+	_refresh_ui()
 
 
 func _on_level_up_pressed(card_id: String) -> void:
@@ -1768,6 +1860,8 @@ func _on_new_combat_pressed() -> void:
 
 func _on_move_pressed(direction: String) -> void:
 	reward_offers = []
+	shop_card_offers = []
+	shop_card_offers_generated = false
 	var node = run_state.move_to_direction(direction)
 	_push_log("Ti muovi verso %s: %s." % [direction, node.get("name", "nodo sconosciuto")])
 	_enter_current_map_node()
@@ -1793,6 +1887,8 @@ func _on_restart_run_pressed() -> void:
 	defeat_snapshot_saved = false
 	safe_popup_mode = SAFE_POPUP_NONE
 	reward_offers = []
+	shop_card_offers = []
+	shop_card_offers_generated = false
 	_start_new_combat()
 	_push_log("Nuova run. Prima il combattimento, poi il Falò / Shop.")
 	if not thief_rewards.is_empty():

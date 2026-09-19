@@ -486,6 +486,17 @@ static func get_reward_offers(collection: Array, active_class: String, acquired_
 	return offers
 
 
+static func get_shop_card_offers(collection: Array, active_class: String, acquired_classes: Array) -> Array:
+	var rng = RandomNumberGenerator.new()
+	rng.randomize()
+	var offers = []
+	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, true, 1, offers, rng))
+	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 3, offers, rng))
+	if offers.size() < 4:
+		offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 4 - offers.size(), offers, rng))
+	return offers
+
+
 static func _pick_reward_cards(collection: Array, active_class: String, acquired_classes: Array, class_slot: bool, count: int, excluded_ids: Array, rng: RandomNumberGenerator) -> Array:
 	var candidates = []
 	for card in BUILD_CARDS:
