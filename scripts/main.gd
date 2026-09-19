@@ -365,18 +365,12 @@ func _render_cards() -> void:
 	for card_id in run_state.loadout:
 		var card = GameDatabase.get_card(card_id)
 		var button = Button.new()
-		var level = run_state.get_card_level(card_id)
 		var cost = combat_state.get_card_cost_for_current_intent(card_id)
-		button.custom_minimum_size = Vector2(220, 118)
-		button.text = "%s%s\n%s | costo %d\n%s" % [
-			card.get("name", card_id),
-			(" +" + str(level)) if level > 0 else "",
-			_rarity_label(card.get("rarity", "")),
-			cost,
-			card.get("effect_text", ""),
-		]
+		button.custom_minimum_size = Vector2(190, 260)
+		button.text = _get_card_display_text(card_id, "costo %d" % cost, "Gioca")
 		button.tooltip_text = "Classe: %s" % GameDatabase.get_class_name(card.get("class_id", CardRules.CLASS_NEUTRAL))
 		button.disabled = not combat_state.can_play_card(card_id)
+		_apply_card_button_style(button, card)
 		button.pressed.connect(_on_card_pressed.bind(card_id))
 		card_grid.add_child(button)
 
@@ -645,6 +639,50 @@ func _rarity_color(rarity: String) -> Color:
 			return Color(0.42, 0.38, 0.34)
 
 
+func _get_card_display_text(card_id: String, detail_text: String, action_text: String) -> String:
+	var card = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		return "%s\nCarta non trovata" % card_id
+	var level = run_state.get_card_level(card_id)
+	var level_text = " +%d" % level if level > 0 else ""
+	var class_id = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	return "%s%s\n%s\n%s | %s\n\n%s\n\n%s" % [
+		card.get("name", card_id),
+		level_text,
+		GameDatabase.get_class_name(class_id),
+		_rarity_label(card.get("rarity", "")),
+		detail_text,
+		card.get("effect_text", ""),
+		action_text,
+	]
+
+
+func _apply_card_button_style(button: Button, card: Dictionary) -> void:
+	var rarity = String(card.get("rarity", "")) if not card.is_empty() else ""
+	button.add_theme_stylebox_override("normal", _make_card_button_style(rarity, 0.105, 2))
+	button.add_theme_stylebox_override("hover", _make_card_button_style(rarity, 0.145, 3))
+	button.add_theme_stylebox_override("pressed", _make_card_button_style(rarity, 0.075, 3))
+	button.add_theme_stylebox_override("disabled", _make_card_button_style(rarity, 0.06, 1))
+	button.add_theme_color_override("font_color", Color(0.92, 0.90, 0.86))
+	button.add_theme_color_override("font_hover_color", Color(1.0, 0.96, 0.86))
+	button.add_theme_color_override("font_pressed_color", Color(0.86, 0.80, 0.70))
+	button.add_theme_color_override("font_disabled_color", Color(0.46, 0.44, 0.40))
+	button.add_theme_font_size_override("font_size", 14)
+
+
+func _make_card_button_style(rarity: String, shade: float, border_width: int) -> StyleBoxFlat:
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color(shade, shade * 0.92, shade * 0.82)
+	style.border_color = _rarity_color(rarity)
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 10
+	style.content_margin_top = 10
+	style.content_margin_right = 10
+	style.content_margin_bottom = 10
+	return style
+
+
 func _add_map_popup_content(parent: VBoxContainer) -> void:
 	var title = Label.new()
 	title.text = "Mappa"
@@ -731,13 +769,22 @@ func _add_level_shop_box(parent: Control) -> void:
 	level_hint.text = "Scegli una carta: sali di livello, ottieni +5 vita/stamina fino a 100 e quella carta prende +1."
 	content.add_child(level_hint)
 
+	var level_grid = GridContainer.new()
+	level_grid.columns = 2
+	level_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_grid.add_theme_constant_override("h_separation", 12)
+	level_grid.add_theme_constant_override("v_separation", 12)
+	content.add_child(level_grid)
+
 	for card_id in run_state.collection:
 		var card = GameDatabase.get_card(card_id)
 		var level_button = Button.new()
-		level_button.text = "Potenzia %s a +%d" % [card.get("name", card_id), run_state.get_card_level(card_id) + 1]
+		level_button.custom_minimum_size = Vector2(180, 245)
+		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
+		_apply_card_button_style(level_button, card)
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
-		content.add_child(level_button)
+		level_grid.add_child(level_button)
 
 
 func _add_reward_shop_box(parent: Control) -> void:
@@ -768,14 +815,23 @@ func _add_reward_shop_box(parent: Control) -> void:
 	reward_title.add_theme_font_size_override("font_size", 16)
 	content.add_child(reward_title)
 
+	var reward_grid = GridContainer.new()
+	reward_grid.columns = 2
+	reward_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_grid.add_theme_constant_override("h_separation", 12)
+	reward_grid.add_theme_constant_override("v_separation", 12)
+	content.add_child(reward_grid)
+
 	for card_id in REWARD_POOL:
 		if run_state.collection.has(card_id):
 			continue
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
-		reward_button.text = "%s - %s" % [card.get("name", card_id), GameDatabase.get_class_name(card.get("class_id", ""))]
+		reward_button.custom_minimum_size = Vector2(180, 245)
+		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
+		_apply_card_button_style(reward_button, card)
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
-		content.add_child(reward_button)
+		reward_grid.add_child(reward_button)
 
 	if run_state.has_shadow():
 		var shadow_title = Label.new()
@@ -888,7 +944,9 @@ func _render_shop_controls() -> void:
 			continue
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
-		reward_button.text = "%s - %s" % [card.get("name", card_id), GameDatabase.get_class_name(card.get("class_id", ""))]
+		reward_button.custom_minimum_size = Vector2(180, 245)
+		reward_button.text = _get_card_display_text(card_id, "nuova carta", "Acquisisci")
+		_apply_card_button_style(reward_button, card)
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
 		safe_panel.add_child(reward_button)
 
@@ -929,8 +987,10 @@ func _render_level_shop_controls() -> void:
 	for card_id in run_state.collection:
 		var card = GameDatabase.get_card(card_id)
 		var level_button = Button.new()
-		level_button.text = "Compra Lv + potenzia %s a +%d" % [card.get("name", card_id), run_state.get_card_level(card_id) + 1]
+		level_button.custom_minimum_size = Vector2(180, 245)
+		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
+		_apply_card_button_style(level_button, card)
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
 		safe_panel.add_child(level_button)
 
