@@ -222,7 +222,7 @@ func _resume_current_run() -> void:
 	if not has_current_run:
 		return
 	if combat_state.ended and combat_state.victory:
-		if combat_state.rewards_claimed and reward_card_claimed:
+		if combat_state.rewards_claimed:
 			screen_mode = SCREEN_SAFE
 		else:
 			screen_mode = SCREEN_REWARD
@@ -287,7 +287,7 @@ func _refresh_ui() -> void:
 		]
 	elif screen_mode == SCREEN_REWARD:
 		enemy_label.text = "Nemico sconfitto: %s" % String(combat_state.enemy.get("name", "Nemico"))
-		intent_label.text = "Raccogli il bottino e scegli una carta, poi torna al Falò / Shop."
+		intent_label.text = "Raccogli le ricompense. Puoi scegliere fino a 1 carta."
 	else:
 		enemy_label.text = "%s | Vita %d/%d | Veleno %d | Bruciatura %d | Sangue perso %d | Marchio %s" % [
 			combat_state.enemy.get("name", "Nemico"),
@@ -479,8 +479,6 @@ func _render_safe_summary() -> void:
 
 func _render_reward_summary() -> void:
 	_ensure_reward_offers()
-	if reward_offers.is_empty():
-		reward_card_claimed = true
 	card_grid.columns = 1
 	card_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	card_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -491,78 +489,59 @@ func _render_reward_summary() -> void:
 	for child in safe_panel.get_children():
 		child.queue_free()
 
-	var reward_row = HBoxContainer.new()
-	reward_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reward_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	reward_row.add_theme_constant_override("separation", 14)
-	card_grid.add_child(reward_row)
+	var popup_center = CenterContainer.new()
+	popup_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	card_grid.add_child(popup_center)
 
-	var loot_panel = PanelContainer.new()
-	loot_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	loot_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	loot_panel.size_flags_stretch_ratio = 0.85
-	reward_row.add_child(loot_panel)
+	var popup_panel = PanelContainer.new()
+	popup_panel.custom_minimum_size = Vector2(920, 560)
+	popup_center.add_child(popup_panel)
 
-	var loot_content = VBoxContainer.new()
-	loot_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	loot_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	loot_content.add_theme_constant_override("separation", 10)
-	loot_panel.add_child(loot_content)
+	var popup_content = VBoxContainer.new()
+	popup_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	popup_content.add_theme_constant_override("separation", 12)
+	popup_panel.add_child(popup_content)
 
 	var loot_title = Label.new()
-	loot_title.text = "Bottino"
-	loot_title.add_theme_font_size_override("font_size", 20)
-	loot_content.add_child(loot_title)
+	loot_title.text = "Ricompense"
+	loot_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	loot_title.add_theme_font_size_override("font_size", 24)
+	popup_content.add_child(loot_title)
 
-	var soul_reward = int(combat_state.enemy.get("soul_reward", 0))
-	if bool(combat_state.enemy.get("is_shadow", false)):
-		soul_reward += int(combat_state.enemy.get("lost_souls", 0))
+	var soul_reward = _get_visible_soul_reward()
+	var rewards_list = VBoxContainer.new()
+	rewards_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rewards_list.add_theme_constant_override("separation", 6)
+	popup_content.add_child(rewards_list)
+
 	var loot_info = Label.new()
 	loot_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	loot_info.text = "Anime ottenibili: %d" % soul_reward
-	loot_content.add_child(loot_info)
+	loot_info.text = "Anime: %d" % soul_reward
+	rewards_list.add_child(loot_info)
 
-	var claim_button = Button.new()
-	claim_button.text = "Raccogli anime" if not combat_state.rewards_claimed else "Anime raccolte"
-	claim_button.disabled = combat_state.rewards_claimed
-	claim_button.custom_minimum_size = Vector2(240, 48)
-	claim_button.pressed.connect(_on_claim_rewards_pressed)
-	loot_content.add_child(claim_button)
+	if bool(combat_state.enemy.get("is_shadow", false)):
+		var shadow_info = Label.new()
+		shadow_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		shadow_info.text = "Ombra: recupero anime perdute e potenziamento speciale."
+		rewards_list.add_child(shadow_info)
+
+	var card_title = Label.new()
+	card_title.text = "Scegli fino a 1 carta"
+	card_title.add_theme_font_size_override("font_size", 18)
+	popup_content.add_child(card_title)
 
 	var progress = Label.new()
 	progress.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	progress.text = "Carta scelta: %s" % ("si" if reward_card_claimed else "no")
-	loot_content.add_child(progress)
-
-	var enter_shop_button = Button.new()
-	enter_shop_button.text = "Vai al Falò / Shop"
-	enter_shop_button.disabled = not combat_state.rewards_claimed or not reward_card_claimed
-	enter_shop_button.custom_minimum_size = Vector2(240, 52)
-	enter_shop_button.pressed.connect(_enter_safe_area)
-	loot_content.add_child(enter_shop_button)
-
-	var card_panel = PanelContainer.new()
-	card_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	card_panel.size_flags_stretch_ratio = 1.55
-	reward_row.add_child(card_panel)
-
-	var card_content = VBoxContainer.new()
-	card_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	card_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	card_content.add_theme_constant_override("separation", 10)
-	card_panel.add_child(card_content)
-
-	var card_title = Label.new()
-	card_title.text = "Scegli 1 carta"
-	card_title.add_theme_font_size_override("font_size", 20)
-	card_content.add_child(card_title)
+	progress.text = "Carta scelta: %s" % ("si" if reward_card_claimed else "nessuna")
+	popup_content.add_child(progress)
 
 	var reward_scroll = ScrollContainer.new()
 	reward_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	reward_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	reward_scroll.horizontal_scroll_mode = 0
-	card_content.add_child(reward_scroll)
+	popup_content.add_child(reward_scroll)
 
 	var reward_grid = GridContainer.new()
 	reward_grid.columns = CARD_GRID_COLUMNS
@@ -581,6 +560,21 @@ func _render_reward_summary() -> void:
 		_apply_card_button_style(reward_button, card)
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
 		reward_grid.add_child(reward_button)
+
+	var claim_button = Button.new()
+	claim_button.text = "Raccogli ricompense"
+	claim_button.disabled = combat_state.rewards_claimed
+	claim_button.custom_minimum_size = Vector2(280, 54)
+	claim_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	claim_button.pressed.connect(_on_claim_rewards_pressed)
+	popup_content.add_child(claim_button)
+
+
+func _get_visible_soul_reward() -> int:
+	var soul_reward = int(combat_state.enemy.get("soul_reward", 0))
+	if bool(combat_state.enemy.get("is_shadow", false)):
+		soul_reward += int(combat_state.enemy.get("lost_souls", 0))
+	return soul_reward
 
 
 func _render_shop_dashboard() -> void:
@@ -1377,8 +1371,11 @@ func _on_end_intent_pressed() -> void:
 func _on_claim_rewards_pressed() -> void:
 	var result = combat_state.claim_enemy_rewards()
 	_push_log(result.get("message", ""))
+	if not reward_card_claimed:
+		reward_card_claimed = true
 	if run_state.game_won:
 		_push_log("Hai sconfitto il boss finale della tua classe. La run e completa.")
+	_enter_safe_area()
 	_refresh_ui()
 
 

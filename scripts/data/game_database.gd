@@ -433,9 +433,9 @@ static func get_reward_offers(collection: Array, active_class: String, acquired_
 	rng.randomize()
 	var offers = []
 	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, true, 1, offers, rng))
-	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 3, offers, rng))
-	if offers.size() < 4:
-		offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 4 - offers.size(), offers, rng))
+	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 2, offers, rng))
+	if offers.size() < 3:
+		offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 3 - offers.size(), offers, rng))
 	return offers
 
 
