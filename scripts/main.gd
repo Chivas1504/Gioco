@@ -3,6 +3,10 @@ extends Control
 const SCREEN_MENU = "menu"
 const SCREEN_COMBAT = "combat"
 const SCREEN_SAFE = "safe"
+const SAFE_POPUP_NONE = ""
+const SAFE_POPUP_COLLECTION = "collection"
+const SAFE_POPUP_MAP = "map"
+const SAFE_POPUP_SETTINGS = "settings"
 const BASE_WINDOW_SIZE = Vector2i(1280, 720)
 const MIN_WINDOW_SIZE = Vector2i(960, 540)
 
@@ -25,7 +29,7 @@ var combat_state = CombatState.new()
 var log_lines: Array = []
 var screen_mode = SCREEN_MENU
 var has_current_run = false
-var show_collection_view = false
+var safe_popup_mode = SAFE_POPUP_NONE
 
 var screen_title: Label
 var fullscreen_button: Button
@@ -199,7 +203,7 @@ func _show_start_menu() -> void:
 func _start_new_run_from_menu() -> void:
 	run_state.start_new_run(true)
 	has_current_run = true
-	show_collection_view = false
+	safe_popup_mode = SAFE_POPUP_NONE
 	log_lines = []
 	screen_mode = SCREEN_SAFE
 	_prepare_safe_node_state()
@@ -241,6 +245,7 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 func _refresh_ui() -> void:
 	_refresh_fullscreen_button()
 	if screen_mode == SCREEN_MENU:
+		action_scroll.visible = true
 		_render_start_menu()
 		log_label.text = "\n".join(log_lines)
 		return
@@ -284,12 +289,14 @@ func _refresh_ui() -> void:
 		screen_title.text = "Falò / Shop"
 		cards_title.visible = false
 		end_intent_button.visible = false
+		action_scroll.visible = false
 		_render_safe_summary()
 	else:
 		screen_title.text = "Combattimento"
 		cards_title.visible = true
 		cards_title.text = "Carte build disponibili"
 		end_intent_button.visible = true
+		action_scroll.visible = true
 		_render_cards()
 	_render_safe_panel()
 	log_label.text = "\n".join(log_lines)
@@ -376,49 +383,85 @@ func _render_safe_summary() -> void:
 	for child in card_grid.get_children():
 		child.queue_free()
 
-	if show_collection_view:
-		_render_collection_summary()
+	if safe_popup_mode != SAFE_POPUP_NONE:
+		_render_safe_popup_page()
 		return
 
-	var summary = Label.new()
-	summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary.text = "Riposa, spendi anime, scegli una carta o prosegui verso il prossimo combattimento."
-	card_grid.add_child(summary)
-
-	var map_status = Label.new()
-	map_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	map_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	map_status.text = "Mappa: sei in %d,%d. Nodo attuale: %s." % [
-		run_state.map_position.x,
-		run_state.map_position.y,
-		run_state.get_current_node_name(),
-	]
-	card_grid.add_child(map_status)
-
-	var stats = Label.new()
-	stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	stats.text = "Collezione: %d/%d | Loadout: %d/%d | Potenziamenti Ombra: %d" % [
-		run_state.collection.size(),
-		CardRules.COLLECTION_MAX,
-		run_state.loadout.size(),
-		CardRules.LOADOUT_MAX,
-		run_state.special_upgrades.size(),
-	]
-	card_grid.add_child(stats)
-
-	for upgrade_id in run_state.special_upgrades:
-		var upgrade = Label.new()
-		upgrade.text = GameDatabase.get_shadow_upgrade_name(upgrade_id)
-		card_grid.add_child(upgrade)
+	_render_shop_dashboard()
 
 
-func _render_collection_summary() -> void:
+func _render_shop_dashboard() -> void:
+	var dashboard = HBoxContainer.new()
+	dashboard.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	dashboard.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	dashboard.add_theme_constant_override("separation", 12)
+	card_grid.add_child(dashboard)
+
+	var left_rail = VBoxContainer.new()
+	left_rail.custom_minimum_size = Vector2(64, 0)
+	left_rail.add_theme_constant_override("separation", 8)
+	dashboard.add_child(left_rail)
+	_add_safe_nav_button(left_rail, "C", "Collezione / loadout", SAFE_POPUP_COLLECTION)
+	_add_safe_nav_button(left_rail, "M", "Mappa", SAFE_POPUP_MAP)
+	_add_safe_nav_button(left_rail, "I", "Impostazioni", SAFE_POPUP_SETTINGS)
+
+	var shop_grid = GridContainer.new()
+	shop_grid.columns = 2
+	shop_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop_grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shop_grid.add_theme_constant_override("h_separation", 14)
+	shop_grid.add_theme_constant_override("v_separation", 14)
+	dashboard.add_child(shop_grid)
+
+	_add_level_shop_box(shop_grid)
+	_add_reward_shop_box(shop_grid)
+
+
+func _render_safe_popup_page() -> void:
+	var popup_row = HBoxContainer.new()
+	popup_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_row.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	popup_row.add_theme_constant_override("separation", 12)
+	card_grid.add_child(popup_row)
+
+	var left_rail = VBoxContainer.new()
+	left_rail.custom_minimum_size = Vector2(64, 0)
+	left_rail.add_theme_constant_override("separation", 8)
+	popup_row.add_child(left_rail)
+	_add_safe_nav_button(left_rail, "C", "Collezione / loadout", SAFE_POPUP_COLLECTION)
+	_add_safe_nav_button(left_rail, "M", "Mappa", SAFE_POPUP_MAP)
+	_add_safe_nav_button(left_rail, "I", "Impostazioni", SAFE_POPUP_SETTINGS)
+	var close_button = Button.new()
+	close_button.text = "X"
+	close_button.tooltip_text = "Chiudi pagina"
+	close_button.custom_minimum_size = Vector2(54, 44)
+	close_button.pressed.connect(_on_close_safe_popup_pressed)
+	left_rail.add_child(close_button)
+
+	var popup_panel = PanelContainer.new()
+	popup_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	popup_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	popup_row.add_child(popup_panel)
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 10)
+	popup_panel.add_child(content)
+
+	if safe_popup_mode == SAFE_POPUP_COLLECTION:
+		_add_collection_content(content)
+	elif safe_popup_mode == SAFE_POPUP_MAP:
+		_add_map_popup_content(content)
+	elif safe_popup_mode == SAFE_POPUP_SETTINGS:
+		_add_settings_popup_content(content)
+
+
+func _add_collection_content(parent: VBoxContainer) -> void:
 	var title = Label.new()
 	title.text = "Collezione e loadout"
 	title.add_theme_font_size_override("font_size", 18)
-	card_grid.add_child(title)
+	parent.add_child(title)
 
 	var counts = Label.new()
 	counts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -429,7 +472,7 @@ func _render_collection_summary() -> void:
 		run_state.collection.size(),
 		CardRules.COLLECTION_MAX,
 	]
-	card_grid.add_child(counts)
+	parent.add_child(counts)
 
 	var class_names = []
 	for class_id in run_state.acquired_classes:
@@ -438,27 +481,27 @@ func _render_collection_summary() -> void:
 	classes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	classes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	classes.text = "Classi acquisite: %s" % (", ".join(class_names) if not class_names.is_empty() else "nessuna")
-	card_grid.add_child(classes)
+	parent.add_child(classes)
 
-	_add_collection_section("Loadout attuale", run_state.loadout)
+	_add_collection_section(parent, "Loadout attuale", run_state.loadout)
 
 	var reserve_cards = []
 	for card_id in run_state.collection:
 		if not run_state.loadout.has(card_id):
 			reserve_cards.append(card_id)
-	_add_collection_section("In collezione, fuori loadout", reserve_cards)
+	_add_collection_section(parent, "In collezione, fuori loadout", reserve_cards)
 
 
-func _add_collection_section(title_text: String, card_ids: Array) -> void:
+func _add_collection_section(parent: VBoxContainer, title_text: String, card_ids: Array) -> void:
 	var title = Label.new()
 	title.text = title_text
 	title.add_theme_font_size_override("font_size", 16)
-	card_grid.add_child(title)
+	parent.add_child(title)
 
 	if card_ids.is_empty():
 		var empty = Label.new()
 		empty.text = "Nessuna carta."
-		card_grid.add_child(empty)
+		parent.add_child(empty)
 		return
 
 	for card_id in card_ids:
@@ -468,7 +511,7 @@ func _add_collection_section(title_text: String, card_ids: Array) -> void:
 		card_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		if card.is_empty():
 			card_label.text = "%s | carta non trovata" % card_id
-			card_grid.add_child(card_label)
+			parent.add_child(card_label)
 			continue
 		var level = run_state.get_card_level(card_id)
 		var level_text = " +%d" % level if level > 0 else ""
@@ -482,21 +525,189 @@ func _add_collection_section(title_text: String, card_ids: Array) -> void:
 			cost,
 			card.get("effect_text", ""),
 		]
-		card_grid.add_child(card_label)
+		parent.add_child(card_label)
+
+
+func _add_map_popup_content(parent: VBoxContainer) -> void:
+	var title = Label.new()
+	title.text = "Mappa"
+	title.add_theme_font_size_override("font_size", 18)
+	parent.add_child(title)
+
+	var current = Label.new()
+	current.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	current.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	current.text = "Posizione: %d,%d | Nodo: %s" % [
+		run_state.map_position.x,
+		run_state.map_position.y,
+		run_state.get_current_node_name(),
+	]
+	parent.add_child(current)
+
+	var unknown = Label.new()
+	unknown.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	unknown.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	unknown.text = "Boss finale: posizione sconosciuta. Serve un pezzo di mappa o un indizio."
+	parent.add_child(unknown)
+
+	_add_map_controls_to(parent)
+
+
+func _add_settings_popup_content(parent: VBoxContainer) -> void:
+	var title = Label.new()
+	title.text = "Impostazioni"
+	title.add_theme_font_size_override("font_size", 18)
+	parent.add_child(title)
+
+	var fullscreen = Button.new()
+	fullscreen.text = "Alterna schermo intero"
+	fullscreen.pressed.connect(_toggle_fullscreen)
+	parent.add_child(fullscreen)
+
+	var menu_button = Button.new()
+	menu_button.text = "Torna al menu"
+	menu_button.pressed.connect(_on_menu_pressed)
+	parent.add_child(menu_button)
+
+	var hint = Label.new()
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.text = "Audio, controlli e opzioni grafiche arriveranno quando la UI base sara stabile."
+	parent.add_child(hint)
+
+
+func _add_safe_nav_button(parent: VBoxContainer, text: String, tooltip: String, mode: String) -> void:
+	var button = Button.new()
+	button.text = text
+	button.tooltip_text = tooltip
+	button.custom_minimum_size = Vector2(54, 54)
+	button.disabled = safe_popup_mode == mode
+	button.pressed.connect(_on_safe_popup_pressed.bind(mode))
+	parent.add_child(button)
+
+
+func _add_level_shop_box(parent: Control) -> void:
+	var panel = PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(panel)
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+
+	var title = Label.new()
+	title.text = "Potenziamenti"
+	title.add_theme_font_size_override("font_size", 20)
+	content.add_child(title)
+
+	var level_title = Label.new()
+	level_title.text = "Acquista livello: %d anime" % run_state.next_level_cost()
+	level_title.add_theme_font_size_override("font_size", 16)
+	content.add_child(level_title)
+
+	var level_hint = Label.new()
+	level_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	level_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	level_hint.text = "Scegli una carta: sali di livello, ottieni +5 vita/stamina fino a 100 e quella carta prende +1."
+	content.add_child(level_hint)
+
+	for card_id in run_state.collection:
+		var card = GameDatabase.get_card(card_id)
+		var level_button = Button.new()
+		level_button.text = "Potenzia %s a +%d" % [card.get("name", card_id), run_state.get_card_level(card_id) + 1]
+		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
+		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
+		content.add_child(level_button)
+
+
+func _add_reward_shop_box(parent: Control) -> void:
+	var panel = PanelContainer.new()
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(panel)
+
+	var content = VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 8)
+	panel.add_child(content)
+
+	var title = Label.new()
+	title.text = "Mercante"
+	title.add_theme_font_size_override("font_size", 20)
+	content.add_child(title)
+
+	if not combat_state.rewards_claimed:
+		var claim_button = Button.new()
+		claim_button.text = "Raccogli anime"
+		claim_button.pressed.connect(_on_claim_rewards_pressed)
+		content.add_child(claim_button)
+
+	var reward_title = Label.new()
+	reward_title.text = "Ricompensa carta"
+	reward_title.add_theme_font_size_override("font_size", 16)
+	content.add_child(reward_title)
+
+	for card_id in REWARD_POOL:
+		if run_state.collection.has(card_id):
+			continue
+		var card = GameDatabase.get_card(card_id)
+		var reward_button = Button.new()
+		reward_button.text = "%s - %s" % [card.get("name", card_id), GameDatabase.get_class_name(card.get("class_id", ""))]
+		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
+		content.add_child(reward_button)
+
+	if run_state.has_shadow():
+		var shadow_title = Label.new()
+		shadow_title.text = "Ombra: %d anime perdute" % int(run_state.shadow_memory.get("lost_souls", 0))
+		content.add_child(shadow_title)
+		var shadow_button = Button.new()
+		if run_state.can_start_forced_shadow_encounter():
+			shadow_button.text = "Affronta l'Ombra ritornata"
+			shadow_button.pressed.connect(_on_shadow_boss_pressed.bind(true))
+		elif run_state.can_start_first_shadow_encounter():
+			shadow_button.text = "Affronta la tua Ombra"
+			shadow_button.pressed.connect(_on_shadow_boss_pressed.bind(false))
+		else:
+			shadow_button.text = "L'Ombra tornera a Paura 90"
+			shadow_button.disabled = true
+		content.add_child(shadow_button)
+
+
+func _add_map_controls_to(parent: VBoxContainer) -> void:
+	var map_title = Label.new()
+	map_title.text = "Movimento griglia"
+	map_title.add_theme_font_size_override("font_size", 16)
+	parent.add_child(map_title)
+
+	var directions = [
+		["Nord", "north"],
+		["Sud", "south"],
+		["Est", "east"],
+		["Ovest", "west"],
+	]
+	for direction in directions:
+		var move_button = Button.new()
+		move_button.text = "Vai a %s" % direction[0]
+		move_button.disabled = run_state.game_won or run_state.can_start_forced_shadow_encounter() or not combat_state.rewards_claimed
+		move_button.pressed.connect(_on_move_pressed.bind(direction[1]))
+		parent.add_child(move_button)
 
 
 func _render_safe_panel() -> void:
 	for child in safe_panel.get_children():
 		child.queue_free()
 
+	if screen_mode == SCREEN_SAFE:
+		return
+
 	var title = Label.new()
-	title.text = "Falò / Shop di test" if screen_mode == SCREEN_SAFE else "Azioni"
+	title.text = "Azioni"
 	title.add_theme_font_size_override("font_size", 18)
 	safe_panel.add_child(title)
-
-	if screen_mode == SCREEN_SAFE:
-		_render_shop_controls()
-		return
 
 	if not combat_state.ended:
 		var hint = Label.new()
@@ -545,7 +756,7 @@ func _render_shop_controls() -> void:
 		safe_panel.add_child(claim_button)
 
 	var collection_button = Button.new()
-	collection_button.text = "Nascondi collezione / loadout" if show_collection_view else "Vedi collezione / loadout"
+	collection_button.text = "Nascondi collezione / loadout" if safe_popup_mode == SAFE_POPUP_COLLECTION else "Vedi collezione / loadout"
 	collection_button.pressed.connect(_on_toggle_collection_view_pressed)
 	safe_panel.add_child(collection_button)
 
@@ -608,22 +819,7 @@ func _render_level_shop_controls() -> void:
 
 
 func _render_map_controls() -> void:
-	var map_title = Label.new()
-	map_title.text = "Movimento griglia"
-	safe_panel.add_child(map_title)
-
-	var directions = [
-		["Nord", "north"],
-		["Sud", "south"],
-		["Est", "east"],
-		["Ovest", "west"],
-	]
-	for direction in directions:
-		var move_button = Button.new()
-		move_button.text = "Vai a %s" % direction[0]
-		move_button.disabled = run_state.game_won or run_state.can_start_forced_shadow_encounter() or not combat_state.rewards_claimed
-		move_button.pressed.connect(_on_move_pressed.bind(direction[1]))
-		safe_panel.add_child(move_button)
+	_add_map_controls_to(safe_panel)
 
 
 func _on_card_pressed(card_id: String) -> void:
@@ -724,8 +920,24 @@ func _on_menu_pressed() -> void:
 	_refresh_ui()
 
 
+func _on_safe_popup_pressed(mode: String) -> void:
+	if safe_popup_mode == mode:
+		safe_popup_mode = SAFE_POPUP_NONE
+	else:
+		safe_popup_mode = mode
+	_refresh_ui()
+
+
+func _on_close_safe_popup_pressed() -> void:
+	safe_popup_mode = SAFE_POPUP_NONE
+	_refresh_ui()
+
+
 func _on_toggle_collection_view_pressed() -> void:
-	show_collection_view = not show_collection_view
+	if safe_popup_mode == SAFE_POPUP_COLLECTION:
+		safe_popup_mode = SAFE_POPUP_NONE
+	else:
+		safe_popup_mode = SAFE_POPUP_COLLECTION
 	_refresh_ui()
 
 
