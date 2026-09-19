@@ -4,54 +4,67 @@ extends RefCounted
 const CLASSES = {
 	CardRules.CLASS_NEUTRAL: {
 		"name": "Senzaclasse",
+		"rarity": CardRules.RARITY_COMMON,
 		"bonus": "Nessun bonus. Le carte neutrali non hanno penalita.",
 	},
 	CardRules.CLASS_WARRIOR: {
 		"name": "Guerriero",
+		"rarity": CardRules.RARITY_COMMON,
 		"bonus": "La carta leggendaria Guerriero si riattiva fino a due volte.",
 	},
 	CardRules.CLASS_ELF: {
 		"name": "Elfo",
+		"rarity": CardRules.RARITY_COMMON,
 		"bonus": "Vedi l'intento e il nemico e marchiato durante il tuo round.",
 	},
 	CardRules.CLASS_SORCERER: {
 		"name": "Stregone",
+		"rarity": CardRules.RARITY_COMMON,
 		"bonus": "Il nemico e bruciato durante il tuo round; alcune carte scalano sulla bruciatura.",
 	},
 	CardRules.CLASS_VAMPIRE: {
 		"name": "Vampiro",
+		"rarity": CardRules.RARITY_RARE,
 		"bonus": "A fine round recuperi vita dalla stamina spesa e indebolisci il nemico con il sangue accumulato.",
 	},
 	CardRules.CLASS_WEREWOLF: {
 		"name": "Lupo Mannaro",
+		"rarity": CardRules.RARITY_RARE,
 		"bonus": "Il danno inflitto genera sangue; a fine round il sanguinamento del nemico ti restituisce stamina.",
 	},
 	CardRules.CLASS_ZOMBIE: {
 		"name": "Zombie",
+		"rarity": CardRules.RARITY_UNCOMMON,
 		"bonus": "Dopo ogni round le carte del nemico diventano piu pesanti e perdono efficacia.",
 	},
 	CardRules.CLASS_GHOST: {
 		"name": "Fantasma",
+		"rarity": CardRules.RARITY_RARE,
 		"bonus": "Il primo attacco nemico del combattimento ti attraversa.",
 	},
 	CardRules.CLASS_CLERIC: {
 		"name": "Chierico",
+		"rarity": CardRules.RARITY_UNCOMMON,
 		"bonus": "Le carte maledette sono purificate e ignorano i debuff.",
 	},
 	CardRules.CLASS_NECROMANCER: {
 		"name": "Necromante",
+		"rarity": CardRules.RARITY_RARE,
 		"bonus": "Le carte Zombie e Fantasma sono considerate carte di classe.",
 	},
 	CardRules.CLASS_MONSTER_HUNTER: {
 		"name": "Cacciatore di Mostri",
+		"rarity": CardRules.RARITY_UNCOMMON,
 		"bonus": "Una sola carta per ogni classe mostro in collezione non subisce penalita fuori classe.",
 	},
 	CardRules.CLASS_THIEF: {
 		"name": "Ladro",
+		"rarity": CardRules.RARITY_UNCOMMON,
 		"bonus": "Quando muori, la nuova run riparte con meta delle anime dell'ultimo fight vinto.",
 	},
 	CardRules.CLASS_DJIN: {
 		"name": "Djin",
+		"rarity": CardRules.RARITY_LEGENDARY,
 		"bonus": "Classe nascosta legata a patti e desideri proibiti.",
 	},
 }
@@ -408,6 +421,129 @@ static func get_cards_by_class(class_id: String) -> Array:
 static func get_class_name(class_id: String) -> String:
 	var class_data = CLASSES.get(class_id, CLASSES[CardRules.CLASS_NEUTRAL])
 	return String(class_data.get("name", "Senzaclasse"))
+
+
+static func get_class_rarity(class_id: String) -> String:
+	var class_data = CLASSES.get(class_id, CLASSES[CardRules.CLASS_NEUTRAL])
+	return String(class_data.get("rarity", CardRules.RARITY_COMMON))
+
+
+static func get_reward_offers(collection: Array, active_class: String, acquired_classes: Array) -> Array:
+	var rng = RandomNumberGenerator.new()
+	rng.randomize()
+	var offers = []
+	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, true, 1, offers, rng))
+	offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 3, offers, rng))
+	if offers.size() < 4:
+		offers.append_array(_pick_reward_cards(collection, active_class, acquired_classes, false, 4 - offers.size(), offers, rng))
+	return offers
+
+
+static func _pick_reward_cards(collection: Array, active_class: String, acquired_classes: Array, class_slot: bool, count: int, excluded_ids: Array, rng: RandomNumberGenerator) -> Array:
+	var candidates = []
+	for card in BUILD_CARDS:
+		var card_id = String(card.get("id", ""))
+		if card_id.is_empty() or collection.has(card_id) or excluded_ids.has(card_id):
+			continue
+		if class_slot and not _is_class_slot_candidate(card, active_class, acquired_classes):
+			continue
+		if not class_slot and _is_class_reward_candidate(card, active_class, acquired_classes):
+			continue
+		candidates.append({
+			"id": card_id,
+			"weight": _get_reward_weight(card, active_class, acquired_classes, class_slot),
+		})
+	return _take_weighted_cards(candidates, count, rng)
+
+
+static func _is_class_slot_candidate(card: Dictionary, active_class: String, acquired_classes: Array) -> bool:
+	var card_class = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	if card_class == CardRules.CLASS_NEUTRAL:
+		return false
+	if active_class != CardRules.CLASS_NEUTRAL:
+		return CardRules.is_class_match(card_class, active_class)
+	if not acquired_classes.is_empty():
+		return acquired_classes.has(card_class)
+	return true
+
+
+static func _is_class_reward_candidate(card: Dictionary, active_class: String, acquired_classes: Array) -> bool:
+	var card_class = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	if card_class == CardRules.CLASS_NEUTRAL:
+		return false
+	if active_class != CardRules.CLASS_NEUTRAL:
+		return CardRules.is_class_match(card_class, active_class)
+	if not acquired_classes.is_empty():
+		return acquired_classes.has(card_class)
+	return false
+
+
+static func _get_reward_weight(card: Dictionary, active_class: String, acquired_classes: Array, class_slot: bool) -> float:
+	var card_class = String(card.get("class_id", CardRules.CLASS_NEUTRAL))
+	var card_rarity = String(card.get("rarity", CardRules.RARITY_COMMON))
+	var weight = _card_rarity_reward_weight(card_rarity) * _class_rarity_reward_multiplier(get_class_rarity(card_class))
+	if active_class != CardRules.CLASS_NEUTRAL and CardRules.is_class_match(card_class, active_class):
+		weight *= 2.25
+	elif acquired_classes.has(card_class):
+		weight *= 1.45
+	elif card_class == CardRules.CLASS_NEUTRAL:
+		weight *= 0.85
+	if class_slot:
+		weight *= 1.8
+	if card_class == CardRules.CLASS_DJIN:
+		weight *= 0.25
+	return max(weight, 1.0)
+
+
+static func _card_rarity_reward_weight(rarity: String) -> float:
+	match rarity:
+		CardRules.RARITY_COMMON:
+			return 95.0
+		CardRules.RARITY_UNCOMMON:
+			return 58.0
+		CardRules.RARITY_RARE:
+			return 24.0
+		CardRules.RARITY_LEGENDARY:
+			return 5.0
+		_:
+			return 20.0
+
+
+static func _class_rarity_reward_multiplier(rarity: String) -> float:
+	match rarity:
+		CardRules.RARITY_COMMON:
+			return 1.25
+		CardRules.RARITY_UNCOMMON:
+			return 1.0
+		CardRules.RARITY_RARE:
+			return 0.62
+		CardRules.RARITY_LEGENDARY:
+			return 0.18
+		_:
+			return 1.0
+
+
+static func _take_weighted_cards(candidates: Array, count: int, rng: RandomNumberGenerator) -> Array:
+	var picked = []
+	var remaining = candidates.duplicate(true)
+	while picked.size() < count and not remaining.is_empty():
+		var total_weight = 0.0
+		for candidate in remaining:
+			total_weight += float(candidate.get("weight", 0.0))
+		if total_weight <= 0.0:
+			break
+		var roll = rng.randf_range(0.0, total_weight)
+		var running = 0.0
+		var selected_index = 0
+		for index in range(remaining.size()):
+			running += float(remaining[index].get("weight", 0.0))
+			if roll <= running:
+				selected_index = index
+				break
+		var selected = remaining[selected_index]
+		picked.append(String(selected.get("id", "")))
+		remaining.remove_at(selected_index)
+	return picked
 
 
 static func get_base_stamina_cost(card: Dictionary, active_class: String, collection: Array = []) -> int:

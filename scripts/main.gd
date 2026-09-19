@@ -10,26 +10,13 @@ const SAFE_POPUP_SETTINGS = "settings"
 const BASE_WINDOW_SIZE = Vector2i(1280, 720)
 const MIN_WINDOW_SIZE = Vector2i(960, 540)
 
-const REWARD_POOL = [
-	"warrior_clean_slash",
-	"elf_quick_shot",
-	"sorcerer_occult_dart",
-	"vampire_crimson_bite",
-	"werewolf_moon_rend",
-	"zombie_bone_guard",
-	"ghost_phase_touch",
-	"cleric_blessed_mace",
-	"necromancer_grave_pact",
-	"monster_hunter_silver_cut",
-	"thief_backstab",
-]
-
 var run_state = RunState.new()
 var combat_state = CombatState.new()
 var log_lines: Array = []
 var screen_mode = SCREEN_MENU
 var has_current_run = false
 var safe_popup_mode = SAFE_POPUP_NONE
+var reward_offers: Array = []
 
 var screen_title: Label
 var fullscreen_button: Button
@@ -204,10 +191,10 @@ func _start_new_run_from_menu() -> void:
 	run_state.start_new_run(true)
 	has_current_run = true
 	safe_popup_mode = SAFE_POPUP_NONE
+	reward_offers = []
 	log_lines = []
-	screen_mode = SCREEN_SAFE
-	_prepare_safe_node_state()
-	_push_log("La run comincia al Falò iniziale. Scegli una direzione sulla griglia.")
+	_start_new_combat()
+	_push_log("La run comincia nel buio: sopravvivi al primo scontro, poi raggiungerai il Falò / Shop.")
 	_refresh_ui()
 
 
@@ -223,6 +210,7 @@ func _resume_current_run() -> void:
 
 func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 	defeat_snapshot_saved = false
+	reward_offers = []
 	if run_state.can_start_forced_shadow_encounter() and not ignore_forced_shadow:
 		_start_shadow_combat(true)
 		return
@@ -233,6 +221,7 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 
 func _start_shadow_combat(second_encounter: bool) -> void:
 	defeat_snapshot_saved = false
+	reward_offers = []
 	var enemy = GameDatabase.make_shadow_boss(run_state.shadow_memory, run_state.fear, second_encounter)
 	combat_state.start_combat(run_state, enemy)
 	if second_encounter:
@@ -253,7 +242,7 @@ func _refresh_ui() -> void:
 
 	player_label.text = "PG Lv %d | Classe: %s | Vita %d/%d | Stamina %d/%d | Anime %d | Sangue %d | Paura %d" % [
 		run_state.player_level,
-		GameDatabase.get_class_name(run_state.active_class),
+		_get_class_display_text(run_state.active_class),
 		run_state.health,
 		run_state.max_health,
 		run_state.stamina,
@@ -369,7 +358,7 @@ func _render_cards() -> void:
 		button.custom_minimum_size = Vector2(190, 260)
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.text = _get_card_display_text(card_id, "costo %d" % cost, "Gioca")
-		button.tooltip_text = "Classe: %s" % GameDatabase.get_class_name(card.get("class_id", CardRules.CLASS_NEUTRAL))
+		button.tooltip_text = "Classe: %s" % _get_class_display_text(String(card.get("class_id", CardRules.CLASS_NEUTRAL)))
 		button.disabled = not combat_state.can_play_card(card_id)
 		_apply_card_button_style(button, card)
 		button.pressed.connect(_on_card_pressed.bind(card_id))
@@ -512,7 +501,7 @@ func _add_collection_content(parent: VBoxContainer) -> void:
 
 	var class_names = []
 	for class_id in run_state.acquired_classes:
-		class_names.append(GameDatabase.get_class_name(class_id))
+		class_names.append(_get_class_display_text(class_id))
 	var classes = Label.new()
 	classes.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	classes.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -599,7 +588,7 @@ func _add_collection_card(parent: Control, card_id: String) -> void:
 	meta_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	meta_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	meta_label.text = "%s\n%s | costo %d" % [
-		GameDatabase.get_class_name(class_id),
+		_get_class_display_text(class_id),
 		_rarity_label(rarity),
 		cost,
 	]
@@ -650,12 +639,19 @@ func _get_card_display_text(card_id: String, detail_text: String, action_text: S
 	return "%s%s\n%s\n%s | %s\n\n%s\n\n%s" % [
 		card.get("name", card_id),
 		level_text,
-		GameDatabase.get_class_name(class_id),
+		_get_class_display_text(class_id),
 		_rarity_label(card.get("rarity", "")),
 		detail_text,
 		card.get("effect_text", ""),
 		action_text,
 	]
+
+
+func _get_class_display_text(class_id: String) -> String:
+	var class_name = GameDatabase.get_class_name(class_id)
+	if class_id == CardRules.CLASS_NEUTRAL:
+		return class_name
+	return "%s (%s)" % [class_name, _rarity_label(GameDatabase.get_class_rarity(class_id))]
 
 
 func _apply_card_button_style(button: Button, card: Dictionary) -> void:
@@ -797,6 +793,7 @@ func _add_level_shop_box(parent: Control) -> void:
 
 
 func _add_reward_shop_box(parent: Control) -> void:
+	_ensure_reward_offers()
 	var panel = PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -837,9 +834,7 @@ func _add_reward_shop_box(parent: Control) -> void:
 	reward_grid.add_theme_constant_override("v_separation", 12)
 	reward_scroll.add_child(reward_grid)
 
-	for card_id in REWARD_POOL:
-		if run_state.collection.has(card_id):
-			continue
+	for card_id in reward_offers:
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
 		reward_button.custom_minimum_size = Vector2(180, 245)
@@ -955,9 +950,8 @@ func _render_shop_controls() -> void:
 	reward_title.text = "Ricompensa carta"
 	safe_panel.add_child(reward_title)
 
-	for card_id in REWARD_POOL:
-		if run_state.collection.has(card_id):
-			continue
+	_ensure_reward_offers()
+	for card_id in reward_offers:
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
 		reward_button.custom_minimum_size = Vector2(180, 245)
@@ -1050,7 +1044,8 @@ func _on_claim_rewards_pressed() -> void:
 func _on_reward_card_pressed(card_id: String) -> void:
 	var card = GameDatabase.get_card(card_id)
 	if run_state.acquire_card(card_id):
-		_push_log("Acquisisci %s. Classe attiva: %s." % [card.get("name", card_id), GameDatabase.get_class_name(run_state.active_class)])
+		reward_offers.erase(card_id)
+		_push_log("Acquisisci %s. Classe attiva: %s." % [card.get("name", card_id), _get_class_display_text(run_state.active_class)])
 	else:
 		_push_log("Collezione piena o carta non valida.")
 	_refresh_ui()
@@ -1077,6 +1072,7 @@ func _on_new_combat_pressed() -> void:
 
 
 func _on_move_pressed(direction: String) -> void:
+	reward_offers = []
 	var node = run_state.move_to_direction(direction)
 	_push_log("Ti muovi verso %s: %s." % [direction, node.get("name", "nodo sconosciuto")])
 	_enter_current_map_node()
@@ -1100,9 +1096,10 @@ func _on_restart_run_pressed() -> void:
 	run_state.start_new_run(true)
 	has_current_run = true
 	defeat_snapshot_saved = false
-	screen_mode = SCREEN_SAFE
-	_prepare_safe_node_state()
-	_push_log("Nuova run. Da qualche parte, l'Ombra custodisce cio che hai perso.")
+	safe_popup_mode = SAFE_POPUP_NONE
+	reward_offers = []
+	_start_new_combat()
+	_push_log("Nuova run. Prima il combattimento, poi il Falò / Shop.")
 	if not thief_rewards.is_empty():
 		_push_log("Il Ladro riparte con %d anime dell'ultimo bottino." % int(thief_rewards.get("anime", 0)))
 	_refresh_ui()
@@ -1135,6 +1132,7 @@ func _on_toggle_collection_view_pressed() -> void:
 
 
 func _enter_safe_area() -> void:
+	_refresh_reward_offers()
 	screen_mode = SCREEN_SAFE
 
 
@@ -1175,6 +1173,7 @@ func _resolve_event_node() -> void:
 
 
 func _prepare_safe_node_state() -> void:
+	_ensure_reward_offers()
 	combat_state.ended = true
 	combat_state.victory = true
 	combat_state.rewards_claimed = true
@@ -1188,6 +1187,15 @@ func _prepare_safe_node_state() -> void:
 		"marked": false,
 		"intents": [],
 	}
+
+
+func _refresh_reward_offers() -> void:
+	reward_offers = GameDatabase.get_reward_offers(run_state.collection, run_state.active_class, run_state.acquired_classes)
+
+
+func _ensure_reward_offers() -> void:
+	if reward_offers.is_empty():
+		_refresh_reward_offers()
 
 
 func _save_shadow_after_defeat() -> void:
