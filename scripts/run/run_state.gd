@@ -64,6 +64,10 @@ func start_new_run(keep_shadow: bool = true) -> void:
 		"neutral_parry",
 		"neutral_dodge",
 		"neutral_catch_breath",
+		"neutral_uncertain_lunge",
+		"neutral_low_cut",
+		"neutral_heavy_swing",
+		"neutral_shield_bash",
 	]
 	loadout = collection.duplicate()
 	consumable_slots = []
