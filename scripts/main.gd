@@ -37,6 +37,7 @@ var log_label: RichTextLabel
 var cards_title: Label
 var card_grid: GridContainer
 var hand_spacer: Control
+var combat_action_panel: VBoxContainer
 var safe_panel: VBoxContainer
 var action_scroll: ScrollContainer
 var end_intent_button: Button
@@ -141,14 +142,6 @@ func _build_ui() -> void:
 	hand_spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left_column.add_child(hand_spacer)
 
-	end_intent_button = Button.new()
-	end_intent_button.text = "Risolvi intento nemico"
-	end_intent_button.custom_minimum_size = Vector2(260, 52)
-	end_intent_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	end_intent_button.visible = false
-	end_intent_button.pressed.connect(_on_end_intent_pressed)
-	left_column.add_child(end_intent_button)
-
 	card_grid = GridContainer.new()
 	card_grid.columns = 4
 	card_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -156,6 +149,22 @@ func _build_ui() -> void:
 	card_grid.add_theme_constant_override("h_separation", 10)
 	card_grid.add_theme_constant_override("v_separation", 10)
 	left_column.add_child(card_grid)
+
+	combat_action_panel = VBoxContainer.new()
+	combat_action_panel.custom_minimum_size = Vector2(280, 0)
+	combat_action_panel.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	combat_action_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	combat_action_panel.alignment = BoxContainer.ALIGNMENT_CENTER
+	combat_action_panel.visible = false
+	content_row.add_child(combat_action_panel)
+
+	end_intent_button = Button.new()
+	end_intent_button.text = "Risolvi intento nemico"
+	end_intent_button.custom_minimum_size = Vector2(260, 52)
+	end_intent_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	end_intent_button.visible = false
+	end_intent_button.pressed.connect(_on_end_intent_pressed)
+	combat_action_panel.add_child(end_intent_button)
 
 	action_scroll = ScrollContainer.new()
 	action_scroll.custom_minimum_size = Vector2(300, 0)
@@ -261,6 +270,7 @@ func _refresh_ui() -> void:
 	_clear_card_preview()
 	if screen_mode == SCREEN_MENU:
 		hand_spacer.visible = false
+		combat_action_panel.visible = false
 		end_intent_button.visible = false
 		log_label.visible = true
 		action_scroll.visible = true
@@ -311,6 +321,7 @@ func _refresh_ui() -> void:
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
 		hand_spacer.visible = false
+		combat_action_panel.visible = false
 		end_intent_button.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
@@ -319,6 +330,7 @@ func _refresh_ui() -> void:
 	elif screen_mode == SCREEN_REWARD:
 		screen_title.text = "Ricompensa"
 		hand_spacer.visible = false
+		combat_action_panel.visible = false
 		end_intent_button.visible = false
 		cards_title.visible = false
 		action_scroll.visible = false
@@ -327,6 +339,7 @@ func _refresh_ui() -> void:
 	else:
 		screen_title.text = "Combattimento"
 		hand_spacer.visible = true
+		combat_action_panel.visible = true
 		end_intent_button.visible = true
 		end_intent_button.disabled = combat_state.ended
 		if combat_state.has_staged_cards():
@@ -348,6 +361,7 @@ func _render_start_menu() -> void:
 	player_label.text = ""
 	enemy_label.text = ""
 	intent_label.text = ""
+	combat_action_panel.visible = false
 	cards_title.visible = true
 	end_intent_button.visible = false
 	cards_title.text = "Menu"
@@ -543,18 +557,26 @@ func _render_reward_summary() -> void:
 	reward_scroll.horizontal_scroll_mode = 0
 	popup_content.add_child(reward_scroll)
 
+	var reward_center = CenterContainer.new()
+	reward_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reward_center.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	reward_scroll.add_child(reward_center)
+
 	var reward_grid = GridContainer.new()
 	reward_grid.columns = CARD_GRID_COLUMNS
 	reward_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	reward_grid.add_theme_constant_override("h_separation", 12)
-	reward_grid.add_theme_constant_override("v_separation", 12)
-	reward_scroll.add_child(reward_grid)
+	reward_grid.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	reward_grid.add_theme_constant_override("h_separation", 28)
+	reward_grid.add_theme_constant_override("v_separation", 24)
+	reward_center.add_child(reward_grid)
 
 	for card_id in reward_offers:
 		var card = GameDatabase.get_card(card_id)
 		var reward_button = Button.new()
 		reward_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+		reward_button.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		reward_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		reward_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		reward_button.text = _get_card_display_text(card_id, "ricompensa", "Scegli")
 		reward_button.disabled = reward_card_claimed
 		_apply_card_button_style(reward_button, card)
