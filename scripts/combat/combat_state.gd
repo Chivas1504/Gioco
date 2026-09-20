@@ -92,6 +92,8 @@ func can_play_card(card_id: String) -> bool:
 		return false
 	if stack_turn_owner != "player":
 		return false
+	if _get_last_stack_owner() == "player":
+		return false
 	if not run_state.loadout.has(card_id):
 		return false
 	if used_card_ids.has(card_id):
@@ -128,6 +130,8 @@ func play_card(card_id: String) -> Dictionary:
 func stage_card(card_id: String) -> Dictionary:
 	if not can_play_card(card_id):
 		return {"ok": false, "message": "Non puoi impilare questa carta ora."}
+	if _get_last_stack_owner() == "player":
+		return {"ok": false, "message": "Hai gia giocato: ora tocca al nemico."}
 
 	var card = GameDatabase.get_card(card_id)
 	var cost = get_card_cost_for_current_intent(card_id)
@@ -581,6 +585,17 @@ func _start_new_stack_turn(messages: Array) -> void:
 func _take_enemy_stack_turn(messages: Array) -> void:
 	if ended or stack_turn_owner != "enemy":
 		return
+	if _get_last_stack_owner() == "enemy":
+		if stack_resolver == "enemy" and _enemy_should_resolve_stack_after_play():
+			messages.append("%s decide di chiudere la pila." % enemy.get("name", "Nemico"))
+			var resolve_result = resolve_staged_cards(true)
+			var resolve_message = String(resolve_result.get("message", ""))
+			if not resolve_message.is_empty():
+				messages.append(resolve_message)
+		else:
+			stack_turn_owner = "player"
+			messages.append("%s aspetta: tocca a te." % enemy.get("name", "Nemico"))
+		return
 
 	_stage_enemy_card(messages)
 	if ended:
@@ -676,6 +691,11 @@ func _estimate_enemy_pending_damage() -> int:
 func _stage_enemy_card(messages: Array) -> void:
 	if ended:
 		return
+	if _get_last_stack_owner() == "enemy":
+		stack_turn_owner = "player"
+		if not messages.is_empty():
+			messages.append("%s non puo giocare due volte di fila." % enemy.get("name", "Nemico"))
+		return
 	var intent = _get_enemy_stack_intent()
 	if intent.is_empty():
 		stack_turn_owner = "player"
@@ -685,6 +705,13 @@ func _stage_enemy_card(messages: Array) -> void:
 	stack_turn_owner = "player"
 	if not messages.is_empty():
 		messages.append("%s impila %s." % [enemy.get("name", "Nemico"), intent.get("name", "Intento")])
+
+
+func _get_last_stack_owner() -> String:
+	if staged_stack.is_empty():
+		return ""
+	var last_entry: Dictionary = staged_stack[staged_stack.size() - 1]
+	return String(last_entry.get("owner", ""))
 
 
 func _get_enemy_stack_intent() -> Dictionary:
