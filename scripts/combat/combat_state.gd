@@ -27,8 +27,8 @@ var stack_resolver = "enemy"
 var stamina_refilled_after_combat = false
 var enemy_cards_staged_this_round = 0
 var initiative_rng = RandomNumberGenerator.new()
-const ENEMY_MIN_STACK_TO_RESOLVE = 4
-const ENEMY_MAX_STACK_BEFORE_RESOLVE = 8
+const ENEMY_MIN_STACK_TO_RESOLVE = 6
+const ENEMY_MAX_STACK_BEFORE_RESOLVE = 11
 
 func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
@@ -141,6 +141,7 @@ func stage_card(card_id: String) -> Dictionary:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
 	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
 	stack_turn_owner = "enemy"
+	messages.append("Tocca al nemico.")
 	_take_enemy_stack_turn(messages)
 	if not ended and stack_turn_owner == "player":
 		if stack_resolver == "player":
@@ -182,7 +183,13 @@ func pass_stack_turn() -> Dictionary:
 		return {"ok": false, "message": "Non puoi passare adesso."}
 	var messages = ["Passi il turno senza risolvere la pila."]
 	stack_turn_owner = "enemy"
+	messages.append("Tocca al nemico.")
 	_take_enemy_stack_turn(messages)
+	if not ended and stack_turn_owner == "player":
+		if stack_resolver == "player":
+			messages.append("Torna a te: puoi risolvere, giocare o passare.")
+		else:
+			messages.append("Torna a te: puoi giocare o passare.")
 	return {"ok": true, "message": " ".join(messages)}
 
 
@@ -594,26 +601,31 @@ func _take_enemy_stack_turn(messages: Array) -> void:
 
 
 func _enemy_should_resolve_stack_after_play() -> bool:
-	if staged_stack.size() < 2:
-		return false
-	return (
-		staged_stack.size() >= ENEMY_MAX_STACK_BEFORE_RESOLVE
-		or _enemy_pending_damage_can_defeat_player()
-		or not _player_has_available_stack_action()
-	)
+	return _enemy_should_resolve_stack_with_roll()
 
 
 func _enemy_should_resolve_stack() -> bool:
+	return _enemy_should_resolve_stack_with_roll()
+
+
+func _enemy_should_resolve_stack_with_roll() -> bool:
 	if staged_stack.size() < 2:
 		return false
-	if staged_stack.size() < ENEMY_MIN_STACK_TO_RESOLVE and _player_has_available_stack_action():
+	if _enemy_pending_damage_can_defeat_player():
+		return true
+	if _player_pending_damage_can_defeat_enemy() and staged_stack.size() < ENEMY_MAX_STACK_BEFORE_RESOLVE:
 		return false
-	return (
-		staged_stack.size() >= ENEMY_MAX_STACK_BEFORE_RESOLVE
-		or _enemy_pending_damage_can_defeat_player()
-		or not _player_has_available_stack_action()
-		or staged_stack.size() >= ENEMY_MIN_STACK_TO_RESOLVE
-	)
+	if not _player_has_available_stack_action():
+		return true
+	if staged_stack.size() < ENEMY_MIN_STACK_TO_RESOLVE:
+		return false
+	if staged_stack.size() >= ENEMY_MAX_STACK_BEFORE_RESOLVE:
+		return true
+
+	var stack_pressure = float(staged_stack.size() - ENEMY_MIN_STACK_TO_RESOLVE + 1) / float(ENEMY_MAX_STACK_BEFORE_RESOLVE - ENEMY_MIN_STACK_TO_RESOLVE + 1)
+	var damage_pressure = clamp(float(_estimate_enemy_pending_damage()) / max(1.0, float(run_state.health)), 0.0, 1.0)
+	var resolve_chance = clamp(0.12 + stack_pressure * 0.35 + damage_pressure * 0.25, 0.12, 0.75)
+	return initiative_rng.randf() < resolve_chance
 
 
 func _player_has_available_stack_action() -> bool:
@@ -627,6 +639,31 @@ func _player_has_available_stack_action() -> bool:
 
 func _enemy_pending_damage_can_defeat_player() -> bool:
 	return _estimate_enemy_pending_damage() >= run_state.health
+
+
+func _player_pending_damage_can_defeat_enemy() -> bool:
+	return _estimate_player_pending_damage() >= int(enemy.get("health", 0))
+
+
+func _estimate_player_pending_damage() -> int:
+	var pending_damage = 0
+	for entry in staged_stack:
+		var stack_entry: Dictionary = entry
+		if String(stack_entry.get("owner", "")) != "player":
+			continue
+		var card_id = String(stack_entry.get("card_id", ""))
+		var card = GameDatabase.get_card(card_id)
+		if card.is_empty():
+			continue
+		var effects: Dictionary = card.get("effects", {})
+		var level = run_state.get_card_level(card_id)
+		var damage = int(effects.get("damage", 0)) + level * int(effects.get("damage_per_level", 0))
+		if effects.has("execute_bonus") and int(enemy.get("health", 0)) <= floori(float(enemy.get("max_health", 1)) / 2.0):
+			damage += int(effects.get("execute_bonus", 0))
+		if effects.has("bonus_if_burning") and int(enemy.get("burn", 0)) > 0:
+			damage += int(effects.get("bonus_if_burning", 0))
+		pending_damage += max(0, damage)
+	return pending_damage
 
 
 func _estimate_enemy_pending_damage() -> int:
