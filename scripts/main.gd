@@ -1400,7 +1400,7 @@ func _add_card_art_layer(parent: Control, card: Dictionary) -> bool:
 	return true
 
 
-func _add_card_art_overlay(parent: Control, card_id: String, color: Color, font_size: int, action_text: String = "", cost_override: int = -1) -> void:
+func _add_card_art_overlay(parent: Control, card_id: String, color: Color, _font_size: int, action_text: String = "", cost_override: int = -1) -> void:
 	var card: Dictionary = GameDatabase.get_card(card_id)
 	if card.is_empty():
 		return
@@ -1412,11 +1412,24 @@ func _add_card_art_overlay(parent: Control, card_id: String, color: Color, font_
 		effect_text = "%s\n%s" % [effect_text, action_text]
 	var cost: int = cost_override if cost_override >= 0 else _get_card_base_cost_for_overlay(card)
 	var damage_text: String = _get_card_damage_text(card, level)
+	var overlay_scale: float = _get_card_overlay_scale(parent)
+	var title_size: int = clampi(roundi(15.0 * overlay_scale), 8, 16)
+	var body_size: int = clampi(roundi(12.0 * overlay_scale), 6, 12)
+	var number_size: int = clampi(roundi(30.0 * overlay_scale), 15, 28)
 
-	_add_card_art_text(parent, title_text.to_upper(), Rect2(0.16, 0.034, 0.68, 0.072), Color(0.20, 0.14, 0.10), max(8, font_size - 1), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "title")
-	_add_card_art_text(parent, effect_text, Rect2(0.16, 0.722, 0.68, 0.155), Color(0.12, 0.085, 0.055), max(7, font_size - 4), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "body")
-	_add_card_art_text(parent, damage_text, Rect2(0.045, 0.858, 0.16, 0.105), Color(1.0, 0.82, 0.48), max(17, font_size + 8), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
-	_add_card_art_text(parent, "%d" % cost, Rect2(0.795, 0.858, 0.16, 0.105), Color(0.72, 0.92, 1.0), max(17, font_size + 8), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
+	_add_card_art_text(parent, title_text.to_upper(), Rect2(0.14, 0.029, 0.72, 0.090), Color(0.18, 0.115, 0.075), title_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "title")
+	_add_card_art_text(parent, effect_text, Rect2(0.16, 0.715, 0.68, 0.165), Color(0.105, 0.070, 0.045), body_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "body")
+	_add_card_art_text(parent, damage_text, Rect2(0.025, 0.840, 0.205, 0.145), Color(1.0, 0.93, 0.72), number_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
+	_add_card_art_text(parent, "%d" % cost, Rect2(0.770, 0.840, 0.205, 0.145), Color(0.80, 0.94, 1.0), number_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
+
+
+func _get_card_overlay_scale(parent: Control) -> float:
+	var card_size: Vector2 = parent.size
+	if card_size.y <= 1.0:
+		card_size = parent.custom_minimum_size
+	if card_size.y <= 1.0:
+		card_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
+	return clamp(card_size.y / float(CARD_HEIGHT), 0.55, 1.15)
 
 
 func _add_card_art_text(parent: Control, text: String, anchor_rect: Rect2, color: Color, font_size: int, horizontal: HorizontalAlignment, vertical: VerticalAlignment, font_role: String = "body") -> void:
@@ -1465,7 +1478,7 @@ func _get_card_text_outline_size(font_role: String) -> int:
 		return 0
 	if font_role == "title":
 		return 1
-	return 3
+	return 2
 
 
 func _get_card_damage_text(card: Dictionary, level: int) -> String:
