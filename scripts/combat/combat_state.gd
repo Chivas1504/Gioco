@@ -27,6 +27,8 @@ var stack_resolver = "enemy"
 var stamina_refilled_after_combat = false
 var enemy_cards_staged_this_round = 0
 var initiative_rng = RandomNumberGenerator.new()
+const ENEMY_MIN_STACK_TO_RESOLVE = 4
+const ENEMY_MAX_STACK_BEFORE_RESOLVE = 8
 
 func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
@@ -138,11 +140,13 @@ func stage_card(card_id: String) -> Dictionary:
 	if used_sorcerer_bonus:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
 	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
-	stack_turn_owner = "player"
-	if stack_resolver == "player":
-		messages.append("Puoi impilare altre carte, risolvere la pila o passare il turno al nemico.")
-	else:
-		messages.append("Puoi impilare altre carte o passare: il nemico chiudera la pila.")
+	stack_turn_owner = "enemy"
+	_take_enemy_stack_turn(messages)
+	if not ended and stack_turn_owner == "player":
+		if stack_resolver == "player":
+			messages.append("Tocca a te: puoi risolvere, giocare o passare.")
+		else:
+			messages.append("Tocca a te: puoi giocare o passare, il nemico decide quando chiudere.")
 	return {
 		"ok": true,
 		"message": " ".join(messages),
@@ -177,13 +181,8 @@ func pass_stack_turn() -> Dictionary:
 	if not can_pass_stack_turn():
 		return {"ok": false, "message": "Non puoi passare adesso."}
 	var messages = ["Passi il turno senza risolvere la pila."]
-	_stage_enemy_card(messages)
-	if stack_resolver == "enemy" and not staged_stack.is_empty() and not ended:
-		messages.append("Il nemico, giocando per secondo, chiude la pila.")
-		var resolve_result = resolve_staged_cards(true)
-		var resolve_message = String(resolve_result.get("message", ""))
-		if not resolve_message.is_empty():
-			messages.append(resolve_message)
+	stack_turn_owner = "enemy"
+	_take_enemy_stack_turn(messages)
 	return {"ok": true, "message": " ".join(messages)}
 
 
@@ -570,6 +569,82 @@ func _start_new_stack_turn(messages: Array) -> void:
 		if not messages.is_empty():
 			messages.append("Il nemico vince il lancio: gioca per primo, puoi chiudere tu la pila.")
 		_stage_enemy_card(messages)
+
+
+func _take_enemy_stack_turn(messages: Array) -> void:
+	if ended or stack_turn_owner != "enemy":
+		return
+	if stack_resolver == "enemy" and _enemy_should_resolve_stack():
+		messages.append("%s decide di chiudere la pila." % enemy.get("name", "Nemico"))
+		var resolve_result = resolve_staged_cards(true)
+		var resolve_message = String(resolve_result.get("message", ""))
+		if not resolve_message.is_empty():
+			messages.append(resolve_message)
+		return
+
+	_stage_enemy_card(messages)
+	if ended:
+		return
+	if stack_resolver == "enemy" and _enemy_should_resolve_stack_after_play():
+		messages.append("%s ha caricato abbastanza la pila e la chiude." % enemy.get("name", "Nemico"))
+		var resolve_result = resolve_staged_cards(true)
+		var resolve_message = String(resolve_result.get("message", ""))
+		if not resolve_message.is_empty():
+			messages.append(resolve_message)
+
+
+func _enemy_should_resolve_stack_after_play() -> bool:
+	if staged_stack.size() < 2:
+		return false
+	return (
+		staged_stack.size() >= ENEMY_MAX_STACK_BEFORE_RESOLVE
+		or _enemy_pending_damage_can_defeat_player()
+		or not _player_has_available_stack_action()
+	)
+
+
+func _enemy_should_resolve_stack() -> bool:
+	if staged_stack.size() < 2:
+		return false
+	if staged_stack.size() < ENEMY_MIN_STACK_TO_RESOLVE and _player_has_available_stack_action():
+		return false
+	return (
+		staged_stack.size() >= ENEMY_MAX_STACK_BEFORE_RESOLVE
+		or _enemy_pending_damage_can_defeat_player()
+		or not _player_has_available_stack_action()
+		or staged_stack.size() >= ENEMY_MIN_STACK_TO_RESOLVE
+	)
+
+
+func _player_has_available_stack_action() -> bool:
+	for card_id in run_state.loadout:
+		if used_card_ids.has(card_id):
+			continue
+		if run_state.stamina >= get_card_cost_for_current_intent(card_id):
+			return true
+	return false
+
+
+func _enemy_pending_damage_can_defeat_player() -> bool:
+	return _estimate_enemy_pending_damage() >= run_state.health
+
+
+func _estimate_enemy_pending_damage() -> int:
+	var pending_damage = 0
+	for entry in staged_stack:
+		var stack_entry: Dictionary = entry
+		if String(stack_entry.get("owner", "")) != "enemy":
+			continue
+		var intent: Dictionary = {}
+		if stack_entry.has("intent"):
+			intent = stack_entry["intent"]
+		if intent.get("kind") != "attack":
+			continue
+		var incoming = int(intent.get("damage", 0)) + enemy_strength_bonus + incoming_damage_bonus
+		incoming = max(0, incoming - enemy_card_cost_tax)
+		incoming = max(0, incoming - weakened_next_intent)
+		pending_damage += max(0, incoming)
+	return pending_damage
 
 
 func _stage_enemy_card(messages: Array) -> void:
