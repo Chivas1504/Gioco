@@ -18,11 +18,11 @@ const SHOP_CARD_HEIGHT = 205
 const SHOP_CONSUMABLE_SLOT_WIDTH = 150
 const SHOP_CONSUMABLE_SLOT_HEIGHT = 92
 const CARD_GRID_COLUMNS = 3
-const HAND_CARD_WIDTH = 118
-const HAND_CARD_HEIGHT = 170
+const HAND_CARD_WIDTH = 150
+const HAND_CARD_HEIGHT = 220
 const HAND_CARD_COLUMNS = 12
 const HAND_CARD_ZOOM = 1.12
-const HAND_CARD_MIN_SCALE = 0.62
+const HAND_CARD_MIN_SCALE = 0.48
 const STACK_CARD_OFFSET = Vector2(18, 12)
 const STACK_CARD_MIN_SCALE = 0.58
 const STACK_CARD_PREVIEW_WIDTH = 230
@@ -1374,7 +1374,8 @@ func _add_card_button_content(button: Button, card_id: String, text: String, col
 	if _add_card_art_layer(button, card):
 		button.text = ""
 	else:
-		button.text = text
+		button.text = ""
+		_add_fixed_card_label(button, text, color, font_size)
 		return
 	_add_card_art_overlay(button, card_id, color, font_size, action_text, cost_override)
 
