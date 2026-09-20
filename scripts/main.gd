@@ -261,71 +261,51 @@ func _clear_header_hud() -> void:
 
 func _render_header_hud() -> void:
 	_clear_header_hud()
-	_add_hud_chip(player_hud_row, "PG", "Lv %d" % run_state.player_level)
-	_add_hud_chip(player_hud_row, "Classe", _get_class_display_text(run_state.active_class), 1.45)
-	_add_hud_chip(player_hud_row, "Vita", "%d/%d" % [run_state.health, run_state.max_health])
-	_add_hud_chip(player_hud_row, "Stamina", "%d/%d" % [run_state.stamina, run_state.max_stamina])
-	_add_hud_chip(player_hud_row, "Anime", "%d" % run_state.get_material("anime"))
-	_add_hud_chip(player_hud_row, "Sangue", "%d" % run_state.get_material("sangue"))
-	_add_hud_chip(player_hud_row, "Paura", "%d" % run_state.fear)
+	_add_hud_text(player_hud_row, "PG Lv %d |" % run_state.player_level)
+	_add_hud_text(player_hud_row, "Classe: %s |" % _get_class_display_text(run_state.active_class), 1.45)
+	_add_hud_text(player_hud_row, "Vita %d/%d |" % [run_state.health, run_state.max_health])
+	_add_hud_text(player_hud_row, "Stamina %d/%d |" % [run_state.stamina, run_state.max_stamina])
+	_add_hud_text(player_hud_row, "Anime %d |" % run_state.get_material("anime"))
+	_add_hud_text(player_hud_row, "Sangue %d |" % run_state.get_material("sangue"))
+	_add_hud_text(player_hud_row, "Paura %d" % run_state.fear)
 
 	if screen_mode == SCREEN_SAFE:
-		_add_hud_chip(enemy_hud_row, "Nodo", run_state.get_current_node_name(), 1.55)
-		_add_hud_chip(enemy_hud_row, "Tipo", run_state.get_current_node_type())
-		_add_hud_chip(intent_hud_row, "Posizione", "%d,%d" % [run_state.map_position.x, run_state.map_position.y])
+		_add_hud_text(enemy_hud_row, "Nodo: %s (%s)" % [run_state.get_current_node_name(), run_state.get_current_node_type()], 2.0)
+		_add_hud_text(intent_hud_row, "Posizione: %d,%d" % [run_state.map_position.x, run_state.map_position.y])
 	elif screen_mode == SCREEN_REWARD:
-		_add_hud_chip(enemy_hud_row, "Nemico sconfitto", String(combat_state.enemy.get("name", "Nemico")), 1.55)
-		_add_hud_chip(intent_hud_row, "Ricompense", "scegli fino a 1 carta", 1.55)
+		_add_hud_text(enemy_hud_row, "Nemico sconfitto: %s" % String(combat_state.enemy.get("name", "Nemico")), 1.8)
+		_add_hud_text(intent_hud_row, "Raccogli le ricompense. Puoi scegliere fino a 1 carta.", 2.2)
 	elif screen_mode == SCREEN_COMBAT:
-		_add_hud_chip(enemy_hud_row, "Nemico", String(combat_state.enemy.get("name", "Nemico")), 1.55)
-		_add_hud_chip(enemy_hud_row, "Vita", "%d/%d" % [combat_state.enemy.get("health", 0), combat_state.enemy.get("max_health", 0)])
-		_add_hud_chip(enemy_hud_row, "Veleno", "%d" % combat_state.enemy.get("poison", 0))
-		_add_hud_chip(enemy_hud_row, "Bruciatura", "%d" % combat_state.enemy.get("burn", 0))
-		_add_hud_chip(enemy_hud_row, "Sangue perso", "%d" % combat_state.enemy.get("bleed", 0), 1.25)
-		_add_hud_chip(enemy_hud_row, "Marchio", "si" if bool(combat_state.enemy.get("marked", false)) else "no")
+		_add_hud_text(enemy_hud_row, "%s |" % String(combat_state.enemy.get("name", "Nemico")), 1.45)
+		_add_hud_text(enemy_hud_row, "Vita %d/%d |" % [combat_state.enemy.get("health", 0), combat_state.enemy.get("max_health", 0)])
+		_add_hud_text(enemy_hud_row, "Veleno %d |" % combat_state.enemy.get("poison", 0))
+		_add_hud_text(enemy_hud_row, "Bruciatura %d |" % combat_state.enemy.get("burn", 0))
+		_add_hud_text(enemy_hud_row, "Sangue perso %d |" % combat_state.enemy.get("bleed", 0), 1.25)
+		_add_hud_text(enemy_hud_row, "Marchio %s" % ("si" if bool(combat_state.enemy.get("marked", false)) else "no"))
 
 		var intent = combat_state.current_intent()
 		if intent.get("kind") == "attack":
-			_add_hud_chip(intent_hud_row, "Intento", String(intent.get("name", "")), 1.35)
-			_add_hud_chip(intent_hud_row, "Danni", "%d" % intent.get("damage", 0))
+			_add_hud_text(intent_hud_row, "Intento: %s, %d danni" % [intent.get("name", ""), intent.get("damage", 0)], 1.7)
 		elif intent.get("kind") == "buff":
-			_add_hud_chip(intent_hud_row, "Intento", String(intent.get("name", "")), 1.35)
-			_add_hud_chip(intent_hud_row, "Forza", "+%d" % intent.get("strength", 0))
+			_add_hud_text(intent_hud_row, "Intento: %s, +%d forza" % [intent.get("name", ""), intent.get("strength", 0)], 1.7)
 		else:
-			_add_hud_chip(intent_hud_row, "Intento", "-")
+			_add_hud_text(intent_hud_row, "Intento: -")
 		if combat_state.has_staged_cards():
-			_add_hud_chip(intent_hud_row, "Pila", _format_staged_stack(), 2.25)
+			_add_hud_text(intent_hud_row, "Pila: %s" % _format_staged_stack(), 2.25)
 
 
-func _add_hud_chip(parent: HBoxContainer, title: String, value: String, stretch_ratio: float = 1.0) -> void:
+func _add_hud_text(parent: HBoxContainer, text: String, stretch_ratio: float = 1.0) -> void:
 	if parent == null:
 		return
-	var chip = PanelContainer.new()
-	chip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	chip.size_flags_stretch_ratio = stretch_ratio
-	chip.custom_minimum_size = Vector2(98, 38)
-	chip.add_theme_stylebox_override("panel", _make_hud_chip_style())
-	parent.add_child(chip)
-
-	var content = HBoxContainer.new()
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.alignment = BoxContainer.ALIGNMENT_CENTER
-	content.add_theme_constant_override("separation", 6)
-	chip.add_child(content)
-
-	var title_label = Label.new()
-	title_label.text = title
-	title_label.add_theme_color_override("font_color", Color(0.62, 0.59, 0.52))
-	title_label.add_theme_font_size_override("font_size", 12)
-	content.add_child(title_label)
-
-	var value_label = Label.new()
-	value_label.text = value
-	value_label.clip_text = true
-	value_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	value_label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.84))
-	value_label.add_theme_font_size_override("font_size", 15)
-	content.add_child(value_label)
+	var label = Label.new()
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.size_flags_stretch_ratio = stretch_ratio
+	label.text = text
+	label.clip_text = true
+	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.84))
+	label.add_theme_font_size_override("font_size", 18)
+	parent.add_child(label)
 
 
 func _show_start_menu() -> void:
@@ -1422,19 +1402,6 @@ func _make_consumable_dot_style() -> StyleBoxFlat:
 	style.border_color = Color(0.86, 0.78, 0.60)
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(24)
-	return style
-
-
-func _make_hud_chip_style() -> StyleBoxFlat:
-	var style = StyleBoxFlat.new()
-	style.bg_color = Color(0.085, 0.078, 0.07)
-	style.border_color = Color(0.18, 0.17, 0.15)
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(6)
-	style.content_margin_left = 10
-	style.content_margin_top = 6
-	style.content_margin_right = 10
-	style.content_margin_bottom = 6
 	return style
 
 
