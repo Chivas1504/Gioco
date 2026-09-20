@@ -575,6 +575,13 @@ func _apply_enemy_stack_entry(entry: Dictionary, incoming_pool: Dictionary, mess
 			ghost_phase_available = false
 			messages.append("%s ti attraversa: il bonus Fantasma evita questo attacco." % intent_name)
 		else:
+			var blocked = min(guard, incoming)
+			incoming -= blocked
+			incoming = ceili(float(incoming) * next_damage_multiplier)
+			if guard > 0 or next_damage_multiplier < 1.0:
+				messages.append("%s incontra la tua difesa: %d danni bloccati." % [intent_name, blocked])
+			guard = 0
+			next_damage_multiplier = 1.0
 			incoming_pool["damage"] = int(incoming_pool.get("damage", 0)) + incoming
 			messages.append("%s prepara %d danni." % [intent_name, incoming])
 	elif intent.get("kind") == "buff":
@@ -587,13 +594,8 @@ func _apply_incoming_damage_pool(incoming_pool: Dictionary, messages: Array) -> 
 	var incoming = int(incoming_pool.get("damage", 0))
 	if incoming <= 0:
 		return
-	var blocked = min(guard, incoming)
-	incoming -= blocked
-	incoming = ceili(float(incoming) * next_damage_multiplier)
 	run_state.health = max(0, run_state.health - incoming)
-	messages.append("La pila nemica infligge %d danni in un unico colpo, %d bloccati." % [incoming, blocked])
-	guard = 0
-	next_damage_multiplier = 1.0
+	messages.append("La pila nemica infligge %d danni in un unico colpo." % incoming)
 	_check_low_health_fear(messages)
 
 
