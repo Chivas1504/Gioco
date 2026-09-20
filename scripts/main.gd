@@ -1414,14 +1414,14 @@ func _add_card_art_overlay(parent: Control, card_id: String, color: Color, _font
 	var cost: int = cost_override if cost_override >= 0 else _get_card_base_cost_for_overlay(card)
 	var damage_text: String = _get_card_damage_text(card, level)
 	var overlay_scale: float = _get_card_overlay_scale(parent)
-	var title_size: int = clampi(roundi(15.0 * overlay_scale), 8, 16)
+	var title_size: int = clampi(roundi(13.0 * overlay_scale), 8, 14)
 	var body_size: int = clampi(roundi(12.0 * overlay_scale), 6, 12)
-	var number_size: int = clampi(roundi(30.0 * overlay_scale), 15, 28)
+	var number_size: int = clampi(roundi(27.0 * overlay_scale), 15, 25)
 
-	_add_card_art_text(parent, title_text.to_upper(), Rect2(0.14, 0.029, 0.72, 0.090), Color(0.18, 0.115, 0.075), title_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "title")
+	_add_card_art_text(parent, title_text.to_upper(), Rect2(0.145, 0.018, 0.710, 0.070), Color(0.18, 0.115, 0.075), title_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "title")
 	_add_card_art_text(parent, effect_text, Rect2(0.16, 0.715, 0.68, 0.165), Color(0.105, 0.070, 0.045), body_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "body")
-	_add_card_art_text(parent, damage_text, Rect2(0.025, 0.840, 0.205, 0.145), Color(1.0, 0.93, 0.72), number_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
-	_add_card_art_text(parent, "%d" % cost, Rect2(0.770, 0.840, 0.205, 0.145), Color(0.80, 0.94, 1.0), number_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
+	_add_card_art_text(parent, damage_text, Rect2(0.045, 0.865, 0.145, 0.105), Color(1.0, 0.90, 0.62), number_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
+	_add_card_art_text(parent, "%d" % cost, Rect2(0.810, 0.865, 0.145, 0.105), Color(0.74, 0.90, 1.0), number_size, HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
 
 
 func _get_card_overlay_scale(parent: Control) -> float:
@@ -1460,7 +1460,7 @@ func _add_card_art_text(parent: Control, text: String, anchor_rect: Rect2, color
 func _get_card_overlay_font(font_role: String) -> Font:
 	var font: SystemFont = SystemFont.new()
 	if font_role == "number":
-		font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Times New Roman", "serif"])
+		font.font_names = PackedStringArray(["Algerian", "Perpetua Titling MT", "Copperplate Gothic Bold", "Cambria", "Georgia", "serif"])
 	elif font_role == "title":
 		font.font_names = PackedStringArray(["Cinzel", "Georgia", "Palatino Linotype", "Times New Roman", "serif"])
 	else:
