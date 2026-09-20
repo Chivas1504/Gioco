@@ -123,8 +123,8 @@ func stage_card(card_id: String) -> Dictionary:
 	if used_sorcerer_bonus:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
 	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
-	stack_turn_owner = "resolve"
-	messages.append("Scegli se risolvere la pila o passare il turno al nemico.")
+	stack_turn_owner = "player"
+	messages.append("Puoi impilare altre carte, risolvere la pila o passare il turno al nemico.")
 	return {
 		"ok": true,
 		"message": " ".join(messages),
@@ -142,7 +142,6 @@ func get_staged_card_count() -> int:
 func can_pass_stack_turn() -> bool:
 	return (
 		not ended
-		and has_staged_cards()
 		and (stack_turn_owner == "player" or stack_turn_owner == "resolve")
 	)
 
@@ -593,6 +592,8 @@ func _apply_incoming_damage_pool(incoming_pool: Dictionary, messages: Array) -> 
 	incoming = ceili(float(incoming) * next_damage_multiplier)
 	run_state.health = max(0, run_state.health - incoming)
 	messages.append("La pila nemica infligge %d danni in un unico colpo, %d bloccati." % [incoming, blocked])
+	guard = 0
+	next_damage_multiplier = 1.0
 	_check_low_health_fear(messages)
 
 
