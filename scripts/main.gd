@@ -553,10 +553,10 @@ func _render_cards() -> void:
 		button.size = hand_card_size
 		button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		button.pivot_offset = Vector2(hand_card_size.x / 2.0, hand_card_size.y)
-		button.text = _get_hand_card_display_text(card_id, cost)
 		button.tooltip_text = "Classe: %s" % _get_class_display_text(String(card.get("class_id", CardRules.CLASS_NEUTRAL)))
 		button.disabled = not combat_state.can_play_card(card_id)
 		_apply_card_button_style(button, card)
+		_add_card_button_content(button, card_id, _get_hand_card_display_text(card_id, cost), Color(0.92, 0.90, 0.86), 14)
 		button.mouse_entered.connect(_on_hand_card_mouse_entered.bind(card_id, button))
 		button.mouse_exited.connect(_on_hand_card_mouse_exited.bind(button))
 		button.pressed.connect(_on_card_pressed.bind(card_id))
@@ -601,6 +601,7 @@ func _render_combat_stack_area() -> void:
 			var card = GameDatabase.get_card(card_id)
 			stack_card.tooltip_text = _get_card_display_text(card_id, "in pila", "Pronta")
 			_apply_card_panel_style(stack_card, card)
+			_add_card_art_layer(stack_card, card)
 			_add_stack_card_label(stack_card, _get_stack_player_card_display_text(card_id), Color(0.92, 0.90, 0.86))
 		stack_card.mouse_entered.connect(_on_stack_card_mouse_entered.bind(entry, stack_card))
 		stack_card.mouse_exited.connect(_on_stack_card_mouse_exited.bind(stack_card, index))
@@ -709,9 +710,9 @@ func _render_reward_summary() -> void:
 		reward_button.size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		reward_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		reward_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		reward_button.text = _get_card_display_text(card_id, "ricompensa", "Scegli")
 		reward_button.disabled = reward_card_claimed
 		_apply_card_button_style(reward_button, card)
+		_add_card_button_content(reward_button, card_id, _get_card_display_text(card_id, "ricompensa", "Scegli"), Color(0.92, 0.90, 0.86), 14)
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
 		reward_grid.add_child(reward_button)
 
@@ -813,7 +814,7 @@ func _add_unified_shop_cards(parent: Control) -> void:
 		card_button.size = Vector2(SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT)
 		card_button.disabled = run_state.get_material("anime") < cost or run_state.collection.size() >= CardRules.COLLECTION_MAX
 		_apply_card_button_style(card_button, card)
-		_add_fixed_card_label(card_button, _get_card_display_text(card_id, "%d anime" % cost, "Compra"), Color(0.92, 0.90, 0.86), 12)
+		_add_card_button_content(card_button, card_id, _get_card_display_text(card_id, "%d anime" % cost, "Compra"), Color(0.92, 0.90, 0.86), 12)
 		card_button.pressed.connect(_on_shop_card_buy_pressed.bind(card_id))
 		grid.add_child(card_button)
 
@@ -1062,9 +1063,9 @@ func _add_level_popup_content(parent: VBoxContainer) -> void:
 		var level_button = Button.new()
 		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
+		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14)
 		level_button.pressed.connect(_on_level_popup_card_pressed.bind(card_id))
 		grid.add_child(level_button)
 
@@ -1363,6 +1364,37 @@ func _apply_enemy_stack_panel_style(panel: Panel) -> void:
 
 func _add_stack_card_label(panel: Panel, text: String, color: Color) -> void:
 	_add_fixed_card_label(panel, text, color, 14)
+
+
+func _add_card_button_content(button: Button, card_id: String, text: String, color: Color, font_size: int) -> void:
+	var card: Dictionary = GameDatabase.get_card(card_id)
+	if _add_card_art_layer(button, card):
+		button.text = ""
+	else:
+		button.text = text
+		return
+	_add_fixed_card_label(button, text, color, font_size)
+
+
+func _add_card_art_layer(parent: Control, card: Dictionary) -> bool:
+	var art_path: String = String(card.get("art_path", ""))
+	if art_path.is_empty():
+		return false
+	var texture: Texture2D = load(art_path) as Texture2D
+	if texture == null:
+		return false
+	var art: TextureRect = TextureRect.new()
+	art.set_anchors_preset(Control.PRESET_FULL_RECT)
+	art.offset_left = 0
+	art.offset_top = 0
+	art.offset_right = 0
+	art.offset_bottom = 0
+	art.texture = texture
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_SCALE
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(art)
+	return true
 
 
 func _add_fixed_card_label(parent: Control, text: String, color: Color, font_size: int) -> void:
@@ -1725,9 +1757,9 @@ func _add_level_shop_box(parent: Control) -> void:
 		var level_button = Button.new()
 		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
+		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14)
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
 		level_grid.add_child(level_button)
 
@@ -1886,9 +1918,9 @@ func _render_level_shop_controls() -> void:
 		var card = GameDatabase.get_card(card_id)
 		var level_button = Button.new()
 		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
-		level_button.text = _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia")
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
+		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14)
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
 		safe_panel.add_child(level_button)
 

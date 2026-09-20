@@ -77,6 +77,7 @@ const BUILD_CARDS = [
 		"class_id": CardRules.CLASS_NEUTRAL,
 		"rarity": CardRules.RARITY_COMMON,
 		"cost": 1,
+		"art_path": "res://assets/cards/colpo_rozzo_test.png",
 		"effect_text": "Infliggi 3 danni.",
 		"effects": {"damage": 3, "damage_per_level": 1},
 	},
