@@ -180,7 +180,7 @@ func get_world_level() -> int:
 
 
 func is_dead() -> bool:
-	return health <= 0 or stamina <= 0
+	return health <= 0
 
 
 func add_fear(amount: int) -> int:

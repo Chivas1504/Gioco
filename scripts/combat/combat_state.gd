@@ -23,6 +23,8 @@ var rewards_claimed = false
 var low_health_fear_triggered = false
 var stack_turn_owner = "player"
 var round_starter = "player"
+var stack_resolver = "enemy"
+var stamina_refilled_after_combat = false
 var enemy_cards_staged_this_round = 0
 var initiative_rng = RandomNumberGenerator.new()
 
@@ -49,6 +51,13 @@ func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	victory = false
 	rewards_claimed = false
 	low_health_fear_triggered = false
+	stamina_refilled_after_combat = false
+	if initiative_rng.randi_range(0, 1) == 0:
+		round_starter = "player"
+		stack_resolver = "enemy"
+	else:
+		round_starter = "enemy"
+		stack_resolver = "player"
 	_apply_round_start_class_effects([])
 	_start_new_stack_turn([])
 
@@ -58,6 +67,12 @@ func current_intent() -> Dictionary:
 	if intents.is_empty():
 		return {}
 	return intents[int(enemy.get("intent_index", 0)) % intents.size()]
+
+
+func get_initiative_message() -> String:
+	if round_starter == "player":
+		return "Lancio moneta: inizi tu. Il nemico gioca per secondo e puo chiudere la pila."
+	return "Lancio moneta: inizia il nemico. Tu giochi per secondo e puoi chiudere la pila."
 
 
 func get_card_cost_for_current_intent(card_id: String) -> int:
@@ -124,7 +139,10 @@ func stage_card(card_id: String) -> Dictionary:
 		used_class_bonuses.append(CardRules.CLASS_SORCERER)
 	var messages = ["Impili %s. Stamina -%d." % [card.get("name", card_id), cost]]
 	stack_turn_owner = "player"
-	messages.append("Puoi impilare altre carte, risolvere la pila o passare il turno al nemico.")
+	if stack_resolver == "player":
+		messages.append("Puoi impilare altre carte, risolvere la pila o passare il turno al nemico.")
+	else:
+		messages.append("Puoi impilare altre carte o passare: il nemico chiudera la pila.")
 	return {
 		"ok": true,
 		"message": " ".join(messages),
@@ -139,10 +157,19 @@ func get_staged_card_count() -> int:
 	return staged_stack.size()
 
 
+func can_resolve_stack() -> bool:
+	return (
+		not ended
+		and not staged_stack.is_empty()
+		and stack_turn_owner == "player"
+		and stack_resolver == "player"
+	)
+
+
 func can_pass_stack_turn() -> bool:
 	return (
 		not ended
-		and (stack_turn_owner == "player" or stack_turn_owner == "resolve")
+		and stack_turn_owner == "player"
 	)
 
 
@@ -151,6 +178,12 @@ func pass_stack_turn() -> Dictionary:
 		return {"ok": false, "message": "Non puoi passare adesso."}
 	var messages = ["Passi il turno senza risolvere la pila."]
 	_stage_enemy_card(messages)
+	if stack_resolver == "enemy" and not staged_stack.is_empty() and not ended:
+		messages.append("Il nemico, giocando per secondo, chiude la pila.")
+		var resolve_result = resolve_staged_cards(true)
+		var resolve_message = String(resolve_result.get("message", ""))
+		if not resolve_message.is_empty():
+			messages.append(resolve_message)
 	return {"ok": true, "message": " ".join(messages)}
 
 
@@ -186,11 +219,13 @@ func get_staged_card_names() -> Array:
 	return names
 
 
-func resolve_staged_cards() -> Dictionary:
+func resolve_staged_cards(force: bool = false) -> Dictionary:
 	if ended:
 		return {"ok": false, "message": "Il combattimento e gia finito."}
 	if staged_stack.is_empty():
 		return {"ok": false, "message": "Non hai carte nella pila."}
+	if not force and not can_resolve_stack():
+		return {"ok": false, "message": "Non puoi chiudere tu questa pila: chi va secondo decide quando risolverla."}
 
 	var stack = staged_stack.duplicate(true)
 	staged_card_ids = []
@@ -367,8 +402,7 @@ func _apply_card_effects(card: Dictionary, level: int, damage_pool = null) -> Ar
 
 	if effects.has("recover_stamina"):
 		var stamina_gain = int(effects.get("recover_stamina", 0)) + level * int(effects.get("recover_stamina_per_level", 0))
-		run_state.stamina = min(run_state.max_stamina, run_state.stamina + stamina_gain)
-		messages.append("Recuperi %d stamina." % stamina_gain)
+		messages.append("Non recuperi %d stamina ora: la stamina torna piena a fine combattimento." % stamina_gain)
 
 	if effects.has("incoming_bonus") and not purified:
 		incoming_damage_bonus += int(effects.get("incoming_bonus", 0))
@@ -481,8 +515,7 @@ func _apply_card_effects(card: Dictionary, level: int, damage_pool = null) -> Ar
 	if damage_pool == null and not killed_before and enemy.get("health", 0) <= 0:
 		if effects.has("recover_stamina_on_kill"):
 			var stamina_on_kill = int(effects.get("recover_stamina_on_kill", 0))
-			run_state.stamina = min(run_state.max_stamina, run_state.stamina + stamina_on_kill)
-			messages.append("Recuperi %d stamina." % stamina_on_kill)
+			messages.append("Non recuperi %d stamina ora: la stamina torna piena a fine combattimento." % stamina_on_kill)
 		if effects.has("gain_blood_on_kill"):
 			run_state.add_material("sangue", int(effects.get("gain_blood_on_kill", 0)))
 			messages.append("Guadagni sangue dal colpo finale.")
@@ -511,8 +544,7 @@ func _apply_damage_pool(damage_pool: Dictionary, killed_before: bool, messages: 
 
 	var stamina_on_kill = int(damage_pool.get("recover_stamina_on_kill", 0))
 	if stamina_on_kill > 0:
-		run_state.stamina = min(run_state.max_stamina, run_state.stamina + stamina_on_kill)
-		messages.append("Recuperi %d stamina." % stamina_on_kill)
+		messages.append("Non recuperi %d stamina ora: la stamina torna piena a fine combattimento." % stamina_on_kill)
 
 	var blood_on_kill = int(damage_pool.get("gain_blood_on_kill", 0))
 	if blood_on_kill > 0:
@@ -529,14 +561,14 @@ func _start_new_stack_turn(messages: Array) -> void:
 	staged_stack = []
 	staged_card_ids = []
 	enemy_cards_staged_this_round = 0
-	if initiative_rng.randi_range(0, 1) == 0:
-		round_starter = "player"
+	if round_starter == "player":
 		stack_turn_owner = "player"
 		if not messages.is_empty():
-			messages.append("Hai l'iniziativa: giochi per primo.")
+			messages.append("Hai vinto il lancio: giochi per primo, il nemico puo chiudere la pila.")
 	else:
-		round_starter = "enemy"
 		stack_turn_owner = "enemy"
+		if not messages.is_empty():
+			messages.append("Il nemico vince il lancio: gioca per primo, puoi chiudere tu la pila.")
 		_stage_enemy_card(messages)
 
 
@@ -618,8 +650,7 @@ func _apply_end_of_intent_status(messages: Array) -> void:
 		enemy["bleed"] = max(0, bleed - 1)
 		messages.append("Il sanguinamento infligge %d danni." % bleed)
 		if run_state.active_class == CardRules.CLASS_WEREWOLF:
-			run_state.stamina = min(run_state.max_stamina, run_state.stamina + bleed)
-			messages.append("Il Lupo Mannaro recupera %d stamina dal sangue perso." % bleed)
+			messages.append("Il Lupo Mannaro recuperera la stamina dal sangue solo a fine combattimento.")
 
 
 func _tick_temporary_statuses() -> void:
@@ -674,9 +705,11 @@ func _check_end_state() -> void:
 	if enemy.get("health", 0) <= 0:
 		ended = true
 		victory = true
-	elif run_state.health <= 0 or run_state.stamina <= 0:
+	elif run_state.health <= 0:
 		ended = true
 		victory = false
+	if ended:
+		_refill_stamina_after_combat()
 
 
 func _stop_stack_if_combat_ended(messages: Array) -> bool:
@@ -688,11 +721,22 @@ func _stop_stack_if_combat_ended(messages: Array) -> bool:
 		victory = false
 	if not ended:
 		return false
+	_refill_stamina_after_combat(messages)
 	if victory:
 		messages.append("La pila si interrompe: il nemico cade.")
 	else:
 		messages.append("La pila si interrompe: crolli prima che il resto si risolva.")
 	return true
+
+
+func _refill_stamina_after_combat(messages: Array = []) -> void:
+	if stamina_refilled_after_combat:
+		return
+	stamina_refilled_after_combat = true
+	var missing_stamina = max(0, run_state.max_stamina - run_state.stamina)
+	run_state.stamina = run_state.max_stamina
+	if missing_stamina > 0 and not messages.is_empty():
+		messages.append("Fine combattimento: recuperi tutta la stamina.")
 
 
 func _get_card_trigger_count(card: Dictionary) -> int:

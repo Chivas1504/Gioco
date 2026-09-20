@@ -359,6 +359,7 @@ func _start_new_combat(ignore_forced_shadow: bool = false) -> void:
 		return
 	var enemy = GameDatabase.make_grid_enemy(run_state.current_node, run_state.get_world_level(), run_state.active_class)
 	combat_state.start_combat(run_state, enemy)
+	_push_log(combat_state.get_initiative_message())
 	screen_mode = SCREEN_COMBAT
 
 
@@ -370,6 +371,7 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 	shop_card_offers_generated = false
 	var enemy = GameDatabase.make_shadow_boss(run_state.shadow_memory, run_state.fear, second_encounter)
 	combat_state.start_combat(run_state, enemy)
+	_push_log(combat_state.get_initiative_message())
 	if second_encounter:
 		_push_log("La tua Ombra ritorna. Questa volta non puoi fuggire.")
 	else:
@@ -460,11 +462,15 @@ func _refresh_ui() -> void:
 		hand_spacer.visible = true
 		combat_action_panel.visible = true
 		end_intent_button.visible = true
-		end_intent_button.disabled = combat_state.ended
 		pass_turn_button.visible = combat_state.can_pass_stack_turn()
 		pass_turn_button.disabled = not combat_state.can_pass_stack_turn()
 		if combat_state.has_staged_cards():
-			end_intent_button.text = "Risolvi pila (%d)" % combat_state.get_staged_card_count()
+			if combat_state.can_resolve_stack():
+				end_intent_button.text = "Risolvi pila (%d)" % combat_state.get_staged_card_count()
+				end_intent_button.disabled = false
+			else:
+				end_intent_button.text = "Chiude il nemico (%d)" % combat_state.get_staged_card_count()
+				end_intent_button.disabled = true
 		else:
 			end_intent_button.text = "Gioca una carta"
 			end_intent_button.disabled = true
@@ -1957,7 +1963,7 @@ func _render_safe_panel() -> void:
 	if not combat_state.victory:
 		_save_shadow_after_defeat()
 		var defeat = Label.new()
-		defeat.text = "Sei morto o hai finito stamina. La tua Ombra custodisce le anime perdute."
+		defeat.text = "Sei morto. La tua Ombra custodisce le anime perdute."
 		defeat.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		safe_panel.add_child(defeat)
 		var restart_button = Button.new()
@@ -2055,6 +2061,12 @@ func _on_end_intent_pressed() -> void:
 func _on_pass_stack_turn_pressed() -> void:
 	var result = combat_state.pass_stack_turn()
 	_push_log(result.get("message", ""))
+	if combat_state.ended and combat_state.victory:
+		_push_log("Il nemico cade.")
+		_enter_reward_area()
+	elif combat_state.ended:
+		_save_shadow_after_defeat()
+		_push_log("La run finisce qui.")
 	_refresh_ui()
 
 
