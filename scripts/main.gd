@@ -44,6 +44,9 @@ var fullscreen_button: Button
 var player_label: Label
 var enemy_label: Label
 var intent_label: Label
+var player_status_row: HBoxContainer
+var enemy_status_row: HBoxContainer
+var intent_status_row: HBoxContainer
 var log_label: RichTextLabel
 var cards_title: Label
 var card_grid: GridContainer
@@ -117,25 +120,17 @@ func _build_ui() -> void:
 	root.add_child(status_row)
 
 	player_label = Label.new()
-	player_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	player_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	player_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	player_label.add_theme_font_size_override("font_size", 18)
-	status_row.add_child(player_label)
-
 	enemy_label = Label.new()
-	enemy_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	enemy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	enemy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	enemy_label.add_theme_font_size_override("font_size", 18)
-	status_row.add_child(enemy_label)
-
 	intent_label = Label.new()
-	intent_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	intent_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	intent_label.add_theme_font_size_override("font_size", 18)
-	status_row.add_child(intent_label)
+
+	player_status_row = _make_status_row()
+	status_row.add_child(player_status_row)
+
+	enemy_status_row = _make_status_row()
+	status_row.add_child(enemy_status_row)
+
+	intent_status_row = _make_status_row()
+	status_row.add_child(intent_status_row)
 
 	var content_row = HBoxContainer.new()
 	content_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -244,9 +239,82 @@ func _refresh_header_width() -> void:
 		title_width -= fullscreen_button.size.x + 16.0
 	if screen_title != null:
 		screen_title.custom_minimum_size.x = title_width
-	for label in [player_label, enemy_label, intent_label]:
-		if label != null:
-			label.custom_minimum_size.x = status_width
+	for row in [player_status_row, enemy_status_row, intent_status_row]:
+		if row != null:
+			row.custom_minimum_size.x = status_width
+
+
+func _make_status_row() -> HBoxContainer:
+	var row = HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
+	return row
+
+
+func _clear_status_rows() -> void:
+	for row in [player_status_row, enemy_status_row, intent_status_row]:
+		if row == null:
+			continue
+		for child in row.get_children():
+			child.queue_free()
+
+
+func _render_status_rows() -> void:
+	_clear_status_rows()
+	if screen_mode == SCREEN_MENU:
+		return
+
+	_render_status_row(player_status_row, [
+		"PG Lv %d |" % run_state.player_level,
+		"Classe: %s |" % _get_class_display_text(run_state.active_class),
+		"Vita %d/%d |" % [run_state.health, run_state.max_health],
+		"Stamina %d/%d |" % [run_state.stamina, run_state.max_stamina],
+		"Anime %d |" % run_state.get_material("anime"),
+		"Sangue %d |" % run_state.get_material("sangue"),
+		"Paura %d" % run_state.fear,
+	])
+
+	if screen_mode == SCREEN_SAFE:
+		_render_status_row(enemy_status_row, [
+			"Nodo: %s (%s)" % [run_state.get_current_node_name(), run_state.get_current_node_type()],
+			"Posizione: %d,%d" % [run_state.map_position.x, run_state.map_position.y],
+		])
+	elif screen_mode == SCREEN_REWARD:
+		_render_status_row(enemy_status_row, [
+			"Nemico sconfitto: %s" % String(combat_state.enemy.get("name", "Nemico")),
+			"Puoi scegliere fino a 1 carta.",
+		])
+	else:
+		_render_status_row(enemy_status_row, [
+			"%s |" % String(combat_state.enemy.get("name", "Nemico")),
+			"Vita %d/%d |" % [combat_state.enemy.get("health", 0), combat_state.enemy.get("max_health", 0)],
+			"Veleno %d |" % combat_state.enemy.get("poison", 0),
+			"Bruciatura %d |" % combat_state.enemy.get("burn", 0),
+			"Sangue perso %d |" % combat_state.enemy.get("bleed", 0),
+			"Marchio %s" % ("si" if bool(combat_state.enemy.get("marked", false)) else "no"),
+		])
+
+	var intent_parts: Array = []
+	for line in intent_label.text.split("\n"):
+		var clean_line: String = String(line).strip_edges()
+		if not clean_line.is_empty():
+			intent_parts.append(clean_line)
+	_render_status_row(intent_status_row, intent_parts)
+
+
+func _render_status_row(row: HBoxContainer, parts: Array) -> void:
+	if row == null:
+		return
+	for part in parts:
+		var label = Label.new()
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.text = String(part)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		label.clip_text = true
+		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		label.add_theme_color_override("font_color", Color(0.92, 0.90, 0.84))
+		label.add_theme_font_size_override("font_size", 18)
+		row.add_child(label)
 
 
 func _show_start_menu() -> void:
@@ -314,6 +382,7 @@ func _refresh_ui() -> void:
 	_refresh_header_width()
 	_clear_card_preview()
 	if screen_mode == SCREEN_MENU:
+		_clear_status_rows()
 		hand_spacer.visible = false
 		combat_action_panel.visible = false
 		end_intent_button.visible = false
@@ -363,6 +432,8 @@ func _refresh_ui() -> void:
 			intent_label.text = "Intento: -"
 		if combat_state.has_staged_cards():
 			intent_label.text += "\nPila: %s" % _format_staged_stack()
+
+	_render_status_rows()
 
 	if screen_mode == SCREEN_SAFE:
 		screen_title.text = "Falò / Shop"
