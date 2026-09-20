@@ -118,21 +118,21 @@ func _build_ui() -> void:
 
 	player_label = Label.new()
 	player_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	player_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_FILL
+	player_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	player_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	player_label.add_theme_font_size_override("font_size", 18)
 	status_row.add_child(player_label)
 
 	enemy_label = Label.new()
 	enemy_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	enemy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_FILL
+	enemy_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	enemy_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	enemy_label.add_theme_font_size_override("font_size", 18)
 	status_row.add_child(enemy_label)
 
 	intent_label = Label.new()
 	intent_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_FILL
+	intent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	intent_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intent_label.add_theme_font_size_override("font_size", 18)
 	status_row.add_child(intent_label)
