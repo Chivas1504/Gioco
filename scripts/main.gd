@@ -556,7 +556,7 @@ func _render_cards() -> void:
 		button.tooltip_text = "Classe: %s" % _get_class_display_text(String(card.get("class_id", CardRules.CLASS_NEUTRAL)))
 		button.disabled = not combat_state.can_play_card(card_id)
 		_apply_card_button_style(button, card)
-		_add_card_button_content(button, card_id, _get_hand_card_display_text(card_id, cost), Color(0.92, 0.90, 0.86), 14)
+		_add_card_button_content(button, card_id, _get_hand_card_display_text(card_id, cost), Color(0.92, 0.90, 0.86), 11, "", cost)
 		button.mouse_entered.connect(_on_hand_card_mouse_entered.bind(card_id, button))
 		button.mouse_exited.connect(_on_hand_card_mouse_exited.bind(button))
 		button.pressed.connect(_on_card_pressed.bind(card_id))
@@ -601,8 +601,11 @@ func _render_combat_stack_area() -> void:
 			var card = GameDatabase.get_card(card_id)
 			stack_card.tooltip_text = _get_card_display_text(card_id, "in pila", "Pronta")
 			_apply_card_panel_style(stack_card, card)
-			_add_card_art_layer(stack_card, card)
-			_add_stack_card_label(stack_card, _get_stack_player_card_display_text(card_id), Color(0.92, 0.90, 0.86))
+			if _add_card_art_layer(stack_card, card):
+				var stack_cost = combat_state.get_card_cost_for_current_intent(card_id)
+				_add_card_art_overlay(stack_card, card_id, Color(0.92, 0.90, 0.86), 14, "Pronta", stack_cost)
+			else:
+				_add_stack_card_label(stack_card, _get_stack_player_card_display_text(card_id), Color(0.92, 0.90, 0.86))
 		stack_card.mouse_entered.connect(_on_stack_card_mouse_entered.bind(entry, stack_card))
 		stack_card.mouse_exited.connect(_on_stack_card_mouse_exited.bind(stack_card, index))
 		stack_board.add_child(stack_card)
@@ -712,7 +715,7 @@ func _render_reward_summary() -> void:
 		reward_button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		reward_button.disabled = reward_card_claimed
 		_apply_card_button_style(reward_button, card)
-		_add_card_button_content(reward_button, card_id, _get_card_display_text(card_id, "ricompensa", "Scegli"), Color(0.92, 0.90, 0.86), 14)
+		_add_card_button_content(reward_button, card_id, _get_card_display_text(card_id, "ricompensa", "Scegli"), Color(0.92, 0.90, 0.86), 14, "Scegli")
 		reward_button.pressed.connect(_on_reward_card_pressed.bind(card_id))
 		reward_grid.add_child(reward_button)
 
@@ -814,7 +817,7 @@ func _add_unified_shop_cards(parent: Control) -> void:
 		card_button.size = Vector2(SHOP_CARD_WIDTH, SHOP_CARD_HEIGHT)
 		card_button.disabled = run_state.get_material("anime") < cost or run_state.collection.size() >= CardRules.COLLECTION_MAX
 		_apply_card_button_style(card_button, card)
-		_add_card_button_content(card_button, card_id, _get_card_display_text(card_id, "%d anime" % cost, "Compra"), Color(0.92, 0.90, 0.86), 12)
+		_add_card_button_content(card_button, card_id, _get_card_display_text(card_id, "%d anime" % cost, "Compra"), Color(0.92, 0.90, 0.86), 11, "Compra\n%d anime" % cost)
 		card_button.pressed.connect(_on_shop_card_buy_pressed.bind(card_id))
 		grid.add_child(card_button)
 
@@ -1065,7 +1068,7 @@ func _add_level_popup_content(parent: VBoxContainer) -> void:
 		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
-		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14)
+		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14, "Potenzia\na +%d" % (run_state.get_card_level(card_id) + 1))
 		level_button.pressed.connect(_on_level_popup_card_pressed.bind(card_id))
 		grid.add_child(level_button)
 
@@ -1366,14 +1369,14 @@ func _add_stack_card_label(panel: Panel, text: String, color: Color) -> void:
 	_add_fixed_card_label(panel, text, color, 14)
 
 
-func _add_card_button_content(button: Button, card_id: String, text: String, color: Color, font_size: int) -> void:
+func _add_card_button_content(button: Button, card_id: String, text: String, color: Color, font_size: int, action_text: String = "", cost_override: int = -1) -> void:
 	var card: Dictionary = GameDatabase.get_card(card_id)
 	if _add_card_art_layer(button, card):
 		button.text = ""
 	else:
 		button.text = text
 		return
-	_add_fixed_card_label(button, text, color, font_size)
+	_add_card_art_overlay(button, card_id, color, font_size, action_text, cost_override)
 
 
 func _add_card_art_layer(parent: Control, card: Dictionary) -> bool:
@@ -1395,6 +1398,64 @@ func _add_card_art_layer(parent: Control, card: Dictionary) -> bool:
 	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(art)
 	return true
+
+
+func _add_card_art_overlay(parent: Control, card_id: String, color: Color, font_size: int, action_text: String = "", cost_override: int = -1) -> void:
+	var card: Dictionary = GameDatabase.get_card(card_id)
+	if card.is_empty():
+		return
+	var level: int = run_state.get_card_level(card_id)
+	var level_text: String = " +%d" % level if level > 0 else ""
+	var title_text: String = "%s%s" % [String(card.get("name", card_id)), level_text]
+	var effect_text: String = String(card.get("effect_text", ""))
+	if not action_text.is_empty():
+		effect_text = "%s\n%s" % [effect_text, action_text]
+	var cost: int = cost_override if cost_override >= 0 else _get_card_base_cost_for_overlay(card)
+	var damage_text: String = _get_card_damage_text(card, level)
+
+	_add_card_art_text(parent, title_text, Rect2(0.13, 0.035, 0.74, 0.105), color, max(8, font_size), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
+	_add_card_art_text(parent, effect_text, Rect2(0.15, 0.71, 0.70, 0.18), Color(0.17, 0.13, 0.10), max(7, font_size - 3), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
+	_add_card_art_text(parent, damage_text, Rect2(0.035, 0.845, 0.18, 0.12), Color(0.96, 0.88, 0.72), max(9, font_size + 2), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
+	_add_card_art_text(parent, "%d" % cost, Rect2(0.785, 0.845, 0.18, 0.12), Color(0.72, 0.86, 1.0), max(9, font_size + 2), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
+
+
+func _add_card_art_text(parent: Control, text: String, anchor_rect: Rect2, color: Color, font_size: int, horizontal: HorizontalAlignment, vertical: VerticalAlignment) -> void:
+	var label: Label = Label.new()
+	label.anchor_left = anchor_rect.position.x
+	label.anchor_top = anchor_rect.position.y
+	label.anchor_right = anchor_rect.position.x + anchor_rect.size.x
+	label.anchor_bottom = anchor_rect.position.y + anchor_rect.size.y
+	label.offset_left = 0
+	label.offset_top = 0
+	label.offset_right = 0
+	label.offset_bottom = 0
+	label.text = text
+	label.horizontal_alignment = horizontal
+	label.vertical_alignment = vertical
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.clip_text = true
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color(0.03, 0.025, 0.02))
+	label.add_theme_constant_override("outline_size", 2)
+	label.add_theme_font_size_override("font_size", font_size)
+	parent.add_child(label)
+
+
+func _get_card_damage_text(card: Dictionary, level: int) -> String:
+	var effects: Dictionary = {}
+	if card.has("effects"):
+		effects = card["effects"]
+	var damage: int = int(effects.get("damage", 0)) + level * int(effects.get("damage_per_level", 0))
+	if damage <= 0:
+		return "-"
+	return "%d" % damage
+
+
+func _get_card_base_cost_for_overlay(card: Dictionary) -> int:
+	if card.is_empty():
+		return 0
+	return GameDatabase.get_base_stamina_cost(card, run_state.active_class, run_state.collection)
 
 
 func _add_fixed_card_label(parent: Control, text: String, color: Color, font_size: int) -> void:
@@ -1759,7 +1820,7 @@ func _add_level_shop_box(parent: Control) -> void:
 		level_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
-		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14)
+		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14, "Potenzia\na +%d" % (run_state.get_card_level(card_id) + 1))
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
 		level_grid.add_child(level_button)
 
@@ -1920,7 +1981,7 @@ func _render_level_shop_controls() -> void:
 		level_button.custom_minimum_size = Vector2(CARD_WIDTH, CARD_HEIGHT)
 		level_button.disabled = run_state.get_material("anime") < run_state.next_level_cost()
 		_apply_card_button_style(level_button, card)
-		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14)
+		_add_card_button_content(level_button, card_id, _get_card_display_text(card_id, "a +%d" % (run_state.get_card_level(card_id) + 1), "Potenzia"), Color(0.92, 0.90, 0.86), 14, "Potenzia\na +%d" % (run_state.get_card_level(card_id) + 1))
 		level_button.pressed.connect(_on_level_up_pressed.bind(card_id))
 		safe_panel.add_child(level_button)
 
