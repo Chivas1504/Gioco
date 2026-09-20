@@ -1413,13 +1413,13 @@ func _add_card_art_overlay(parent: Control, card_id: String, color: Color, font_
 	var cost: int = cost_override if cost_override >= 0 else _get_card_base_cost_for_overlay(card)
 	var damage_text: String = _get_card_damage_text(card, level)
 
-	_add_card_art_text(parent, title_text, Rect2(0.13, 0.035, 0.74, 0.105), color, max(8, font_size), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
-	_add_card_art_text(parent, effect_text, Rect2(0.15, 0.71, 0.70, 0.18), Color(0.17, 0.13, 0.10), max(7, font_size - 3), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
-	_add_card_art_text(parent, damage_text, Rect2(0.035, 0.845, 0.18, 0.12), Color(0.96, 0.88, 0.72), max(9, font_size + 2), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
-	_add_card_art_text(parent, "%d" % cost, Rect2(0.785, 0.845, 0.18, 0.12), Color(0.72, 0.86, 1.0), max(9, font_size + 2), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER)
+	_add_card_art_text(parent, title_text.to_upper(), Rect2(0.16, 0.034, 0.68, 0.072), Color(0.20, 0.14, 0.10), max(8, font_size - 1), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "title")
+	_add_card_art_text(parent, effect_text, Rect2(0.16, 0.722, 0.68, 0.155), Color(0.12, 0.085, 0.055), max(7, font_size - 4), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "body")
+	_add_card_art_text(parent, damage_text, Rect2(0.045, 0.858, 0.16, 0.105), Color(1.0, 0.82, 0.48), max(17, font_size + 8), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
+	_add_card_art_text(parent, "%d" % cost, Rect2(0.795, 0.858, 0.16, 0.105), Color(0.72, 0.92, 1.0), max(17, font_size + 8), HORIZONTAL_ALIGNMENT_CENTER, VERTICAL_ALIGNMENT_CENTER, "number")
 
 
-func _add_card_art_text(parent: Control, text: String, anchor_rect: Rect2, color: Color, font_size: int, horizontal: HorizontalAlignment, vertical: VerticalAlignment) -> void:
+func _add_card_art_text(parent: Control, text: String, anchor_rect: Rect2, color: Color, font_size: int, horizontal: HorizontalAlignment, vertical: VerticalAlignment, font_role: String = "body") -> void:
 	var label: Label = Label.new()
 	label.anchor_left = anchor_rect.position.x
 	label.anchor_top = anchor_rect.position.y
@@ -1436,10 +1436,36 @@ func _add_card_art_text(parent: Control, text: String, anchor_rect: Rect2, color
 	label.clip_text = true
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", Color(0.03, 0.025, 0.02))
-	label.add_theme_constant_override("outline_size", 2)
+	label.add_theme_color_override("font_outline_color", _get_card_text_outline_color(font_role))
+	label.add_theme_constant_override("outline_size", _get_card_text_outline_size(font_role))
+	label.add_theme_font_override("font", _get_card_overlay_font(font_role))
 	label.add_theme_font_size_override("font_size", font_size)
 	parent.add_child(label)
+
+
+func _get_card_overlay_font(font_role: String) -> Font:
+	var font: SystemFont = SystemFont.new()
+	if font_role == "number":
+		font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Times New Roman", "serif"])
+	elif font_role == "title":
+		font.font_names = PackedStringArray(["Cinzel", "Georgia", "Palatino Linotype", "Times New Roman", "serif"])
+	else:
+		font.font_names = PackedStringArray(["Georgia", "Palatino Linotype", "Times New Roman", "serif"])
+	return font
+
+
+func _get_card_text_outline_color(font_role: String) -> Color:
+	if font_role == "body":
+		return Color(0.88, 0.76, 0.58, 0.50)
+	return Color(0.015, 0.012, 0.01)
+
+
+func _get_card_text_outline_size(font_role: String) -> int:
+	if font_role == "body":
+		return 0
+	if font_role == "title":
+		return 1
+	return 3
 
 
 func _get_card_damage_text(card: Dictionary, level: int) -> String:
