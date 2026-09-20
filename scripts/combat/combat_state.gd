@@ -318,11 +318,17 @@ func claim_enemy_rewards() -> Dictionary:
 			"message": "Spezzi l'Ombra: recuperi %d anime perdute, ottieni %d anime bonus e ricevi %s." % [recovered_souls, bonus_souls, reward_text],
 		}
 	var souls = _get_enemy_reward_souls()
+	var first_normal_combat: bool = run_state.normal_combat_victories == 0
+	if first_normal_combat:
+		souls = 1000
 	run_state.add_material("anime", souls)
 	run_state.record_victory_rewards({"anime": souls})
+	run_state.normal_combat_victories += 1
 	run_state.mark_current_node_resolved()
 	var fear_message = run_state.register_combat_without_level_up()
 	var message = "Ottieni %d anime." % souls
+	if first_normal_combat:
+		message += " Bonus test primo combattimento attivo."
 	if not fear_message.is_empty():
 		message += " " + fear_message
 	return {"ok": true, "message": message}

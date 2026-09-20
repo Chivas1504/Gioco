@@ -20,6 +20,7 @@ var pending_thief_restart_rewards = {}
 
 var fear = 0
 var combats_since_level_up = 0
+var normal_combat_victories = 0
 var shadow_memory = {}
 var shadow_first_encounter_fled = false
 var shadow_defeated = false
@@ -51,6 +52,7 @@ func start_new_run(keep_shadow: bool = true) -> void:
 	stamina = max_stamina
 	fear = 0
 	combats_since_level_up = 0
+	normal_combat_victories = 0
 	map_position = Vector2i(CardRules.START_MAP_X, CardRules.START_MAP_Y)
 	final_boss_position = Vector2i(CardRules.FINAL_BOSS_X, CardRules.FINAL_BOSS_Y)
 	map_nodes = {}

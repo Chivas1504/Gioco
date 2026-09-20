@@ -96,6 +96,7 @@ func _build_ui() -> void:
 	add_child(root)
 
 	var title_row = HBoxContainer.new()
+	title_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_theme_constant_override("separation", 12)
 	root.add_child(title_row)
 
@@ -111,6 +112,7 @@ func _build_ui() -> void:
 	title_row.add_child(fullscreen_button)
 
 	var status_row = VBoxContainer.new()
+	status_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_row.add_theme_constant_override("separation", 4)
 	root.add_child(status_row)
 
@@ -232,6 +234,18 @@ func _refresh_fullscreen_button() -> void:
 		fullscreen_button.text = "Schermo intero"
 
 
+func _refresh_header_width() -> void:
+	var status_width: float = max(320.0, get_viewport_rect().size.x - 48.0)
+	var title_width: float = status_width
+	if fullscreen_button != null:
+		title_width -= fullscreen_button.size.x + 16.0
+	if screen_title != null:
+		screen_title.custom_minimum_size.x = title_width
+	for label in [player_label, enemy_label, intent_label]:
+		if label != null:
+			label.custom_minimum_size.x = status_width
+
+
 func _show_start_menu() -> void:
 	screen_mode = SCREEN_MENU
 
@@ -294,6 +308,7 @@ func _start_shadow_combat(second_encounter: bool) -> void:
 
 func _refresh_ui() -> void:
 	_refresh_fullscreen_button()
+	_refresh_header_width()
 	_clear_card_preview()
 	if screen_mode == SCREEN_MENU:
 		hand_spacer.visible = false
@@ -636,6 +651,8 @@ func _render_reward_summary() -> void:
 
 
 func _get_visible_soul_reward() -> int:
+	if not bool(combat_state.enemy.get("is_shadow", false)) and run_state.normal_combat_victories == 0:
+		return 1000
 	var soul_reward = int(combat_state.enemy.get("soul_reward", 0))
 	if bool(combat_state.enemy.get("is_shadow", false)):
 		soul_reward += int(combat_state.enemy.get("lost_souls", 0))
