@@ -27,8 +27,8 @@ var stack_resolver = "enemy"
 var stamina_refilled_after_combat = false
 var enemy_cards_staged_this_round = 0
 var initiative_rng = RandomNumberGenerator.new()
-const ENEMY_MIN_STACK_TO_RESOLVE = 6
-const ENEMY_MAX_STACK_BEFORE_RESOLVE = 11
+const ENEMY_MIN_STACK_TO_RESOLVE = 8
+const ENEMY_MAX_STACK_BEFORE_RESOLVE = 14
 
 func start_combat(p_run_state: RunState, p_enemy: Dictionary) -> void:
 	run_state = p_run_state
@@ -581,13 +581,6 @@ func _start_new_stack_turn(messages: Array) -> void:
 func _take_enemy_stack_turn(messages: Array) -> void:
 	if ended or stack_turn_owner != "enemy":
 		return
-	if stack_resolver == "enemy" and _enemy_should_resolve_stack():
-		messages.append("%s decide di chiudere la pila." % enemy.get("name", "Nemico"))
-		var resolve_result = resolve_staged_cards(true)
-		var resolve_message = String(resolve_result.get("message", ""))
-		if not resolve_message.is_empty():
-			messages.append(resolve_message)
-		return
 
 	_stage_enemy_card(messages)
 	if ended:
@@ -601,10 +594,6 @@ func _take_enemy_stack_turn(messages: Array) -> void:
 
 
 func _enemy_should_resolve_stack_after_play() -> bool:
-	return _enemy_should_resolve_stack_with_roll()
-
-
-func _enemy_should_resolve_stack() -> bool:
 	return _enemy_should_resolve_stack_with_roll()
 
 

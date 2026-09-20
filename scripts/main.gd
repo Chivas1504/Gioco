@@ -469,7 +469,7 @@ func _refresh_ui() -> void:
 				end_intent_button.text = "Risolvi pila (%d)" % combat_state.get_staged_card_count()
 				end_intent_button.disabled = false
 			else:
-				end_intent_button.text = "Chiude il nemico (%d)" % combat_state.get_staged_card_count()
+				end_intent_button.text = "Gioca o passa (%d)" % combat_state.get_staged_card_count()
 				end_intent_button.disabled = true
 		else:
 			end_intent_button.text = "Gioca una carta"
